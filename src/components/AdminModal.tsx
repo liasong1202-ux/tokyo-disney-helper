@@ -14,6 +14,12 @@ import {
   Sparkles,
   AlertCircle,
   Zap,
+  Lock,
+  Unlock,
+  Key,
+  Eye,
+  EyeOff,
+  LogOut,
 } from 'lucide-react';
 
 interface AdminModalProps {
@@ -67,16 +73,130 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [hasResendKey, setHasResendKey] = useState(false);
   const [selectedAdminChar, setSelectedAdminChar] = useState<string>('mickey');
 
+  // 🔒 站長身分安全鎖狀態 (Session 儲存)
+  const [adminToken, setAdminToken] = useState<string>(() => {
+    return typeof window !== 'undefined' ? (sessionStorage.getItem('disney_admin_token') || '') : '';
+  });
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [showPasswordText, setShowPasswordText] = useState<boolean>(false);
+  const [loginError, setLoginError] = useState<string>('');
+  const [loggingIn, setLoggingIn] = useState<boolean>(false);
+
+  // 🔑 修改密碼狀態
+  const [showChangePwdModal, setShowChangePwdModal] = useState<boolean>(false);
+  const [oldPwdInput, setOldPwdInput] = useState<string>('');
+  const [newPwdInput, setNewPwdInput] = useState<string>('');
+  const [confirmPwdInput, setConfirmPwdInput] = useState<string>('');
+  const [changePwdError, setChangePwdError] = useState<string>('');
+  const [changePwdLoading, setChangePwdLoading] = useState<boolean>(false);
+
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMsg({ type, text });
     setTimeout(() => setToastMsg(null), 5000);
   };
 
-  const fetchDashboard = async () => {
+  // 登入驗證處理
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordInput.trim()) {
+      setLoginError('請輸入管理員密碼！');
+      return;
+    }
+    setLoggingIn(true);
+    setLoginError('');
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        const token = data.token || passwordInput.trim();
+        setAdminToken(token);
+        sessionStorage.setItem('disney_admin_token', token);
+        setPasswordInput('');
+        setLoginError('');
+        fetchDashboard(token);
+        showToast('success', '🔓 站長身分驗證成功！歡迎回到管理中心');
+      } else {
+        setLoginError(data.error || '密碼錯誤！請輸入正確的站長密碼。');
+      }
+    } catch (err: any) {
+      setLoginError('伺服器連線失敗：' + (err.message || '請確認後端狀態'));
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  // 登出處理
+  const handleLogout = () => {
+    setAdminToken('');
+    sessionStorage.removeItem('disney_admin_token');
+    showToast('success', '已安全登出站長管理後台！');
+  };
+
+  // 修改密碼處理
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPwdInput.trim() || newPwdInput.length < 4) {
+      setChangePwdError('新密碼長度至少需 4 個字元！');
+      return;
+    }
+    if (newPwdInput !== confirmPwdInput) {
+      setChangePwdError('兩次輸入的新密碼不一致！');
+      return;
+    }
+    setChangePwdLoading(true);
+    setChangePwdError('');
+    try {
+      const res = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({
+          oldPassword: oldPwdInput.trim(),
+          newPassword: newPwdInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        const newToken = data.token || newPwdInput.trim();
+        setAdminToken(newToken);
+        sessionStorage.setItem('disney_admin_token', newToken);
+        setShowChangePwdModal(false);
+        setOldPwdInput('');
+        setNewPwdInput('');
+        setConfirmPwdInput('');
+        showToast('success', '🔑 站長密碼修改成功！新密碼已即刻生效。');
+      } else {
+        setChangePwdError(data.error || '密碼修改失敗');
+      }
+    } catch (err: any) {
+      setChangePwdError('連線失敗：' + err.message);
+    } finally {
+      setChangePwdLoading(false);
+    }
+  };
+
+  const fetchDashboard = async (tokenOverride?: string) => {
+    const token = tokenOverride || adminToken;
+    if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/dashboard');
+      const res = await fetch('/api/admin/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       const data = await res.json();
+      if (res.status === 401) {
+        handleLogout();
+        setLoginError('登入狀態已失效，請重新輸入密碼登入！');
+        return;
+      }
       if (data.ok) {
         setSubscribers(data.subscribers || []);
         setClickCounts(data.clickCounts || { Klook: 0, KKday: 0, Official: 0 });
@@ -128,6 +248,87 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
 
   if (!isOpen) return null;
 
+  // 🔒 若尚未通過站長身分驗證，強制鎖定並彈出密碼輸入框
+  if (!adminToken) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border-2 border-slate-200 overflow-hidden animate-in fade-in zoom-in duration-150">
+          {/* 鎖定頁頂部橫幅 */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 text-center relative">
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              title="關閉"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="w-16 h-16 rounded-2xl bg-indigo-600/30 border-2 border-indigo-400/40 flex items-center justify-center mx-auto mb-3 shadow-inner">
+              <Lock className="w-8 h-8 text-indigo-300" />
+            </div>
+            <h3 className="text-xl font-black tracking-tight">🔒 站長身分安全驗證</h3>
+            <p className="text-xs text-indigo-200 mt-1">此專區受密碼保護，請輸入站長專屬金鑰以解鎖管理權限</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="p-6 space-y-4">
+            {loginError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>請輸入站長管理密碼：</span>
+                <span className="text-[11px] text-indigo-600 font-semibold">（預設密碼：disney888）</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPasswordText ? "text" : "password"}
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="請輸入密碼..."
+                  autoFocus
+                  className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordText(!showPasswordText)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  title={showPasswordText ? "隱藏密碼" : "顯示密碼"}
+                >
+                  {showPasswordText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loggingIn}
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-extrabold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loggingIn ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>正在驗證金鑰...</span>
+                </>
+              ) : (
+                <>
+                  <Unlock className="w-4 h-4" />
+                  <span>解鎖站長管理中心</span>
+                </>
+              )}
+            </button>
+
+            <div className="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed">
+              💡 <strong>安全提示：</strong>首次解鎖可使用預設密碼 <code>disney888</code>。登入後可於右上角點選 <strong>「修改密碼」</strong> 自訂您個人的專屬金鑰，防止他人未經授權進入後台！
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   // 儲存聯盟行銷設定
   const handleSaveAffiliate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +336,10 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     try {
       const res = await fetch('/api/admin/affiliate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({
           klookUrl,
           kkdayUrl,
@@ -167,7 +371,10 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     try {
       const res = await fetch('/api/admin/email-settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({
           resendApiKey,
           fromEmail,
@@ -193,7 +400,10 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     try {
       const res = await fetch('/api/admin/promo', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({
           active: activate,
           platform: promoPlatform,
@@ -328,12 +538,31 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowChangePwdModal(true)}
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+              title="修改站長管理密碼"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-300" />
+              <span>修改密碼</span>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+              title="安全登出後台"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>登出</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              title="關閉"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* 導覽分頁 Tabs */}
@@ -990,6 +1219,84 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           )}
         </div>
       </div>
+
+      {/* 🔑 修改站長管理密碼彈出視窗 */}
+      {showChangePwdModal && (
+        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                <Key className="w-4 h-4 text-indigo-600" />
+                <span>修改站長後台密碼</span>
+              </h3>
+              <button
+                onClick={() => { setShowChangePwdModal(false); setChangePwdError(''); }}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {changePwdError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 font-bold">
+                {changePwdError}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">請輸入當前密碼：</label>
+                <input
+                  type="password"
+                  value={oldPwdInput}
+                  onChange={(e) => setOldPwdInput(e.target.value)}
+                  placeholder="當前密碼（預設 disney888）"
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">請輸入新密碼（至少4碼）：</label>
+                <input
+                  type="password"
+                  value={newPwdInput}
+                  onChange={(e) => setNewPwdInput(e.target.value)}
+                  placeholder="請輸入新密碼..."
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">請再次確認新密碼：</label>
+                <input
+                  type="password"
+                  value={confirmPwdInput}
+                  onChange={(e) => setConfirmPwdInput(e.target.value)}
+                  placeholder="請再次輸入新密碼..."
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowChangePwdModal(false); setChangePwdError(''); }}
+                  className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={changePwdLoading}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  {changePwdLoading ? '儲存中...' : '確認修改密碼'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

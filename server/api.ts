@@ -761,9 +761,71 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     }
   }
 
+  // 站長身份驗證小幫手 (檢查請求中的密碼金鑰)
+  function isAuthorizedAdmin(req: IncomingMessage, currentStore: StoreData): boolean {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const customHeader = (req.headers['x-admin-password'] as string) || '';
+    const expectedPassword = currentStore.emailSettings.adminPassword || 'disney888';
+    return (token && token === expectedPassword) || (customHeader && customHeader === expectedPassword);
+  }
+
+  // 4.1 站長身分登入驗證
+  if (pathname === '/api/admin/login' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const store = loadStore();
+      const expectedPassword = store.emailSettings.adminPassword || 'disney888';
+      const inputPass = String(body.password || '').trim();
+
+      if (inputPass && inputPass === expectedPassword) {
+        sendJson(res, 200, { ok: true, token: expectedPassword, message: '站長身份驗證成功！' });
+      } else {
+        sendJson(res, 401, { ok: false, error: '密碼錯誤！請輸入正確的站長管理密碼。' });
+      }
+      return true;
+    } catch (err: any) {
+      sendJson(res, 500, { ok: false, error: err?.message });
+      return true;
+    }
+  }
+
+  // 4.2 站長修改後台管理密碼
+  if (pathname === '/api/admin/change-password' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const store = loadStore();
+      const expectedPassword = store.emailSettings.adminPassword || 'disney888';
+      const oldPass = String(body.oldPassword || '').trim();
+      const newPass = String(body.newPassword || '').trim();
+
+      if (!isAuthorizedAdmin(req, store) && oldPass !== expectedPassword) {
+        sendJson(res, 401, { ok: false, error: '原密碼驗證失敗！無法修改密碼。' });
+        return true;
+      }
+
+      if (!newPass || newPass.length < 4) {
+        sendJson(res, 400, { ok: false, error: '新密碼長度不得少於 4 個字元！' });
+        return true;
+      }
+
+      store.emailSettings.adminPassword = newPass;
+      saveStore(store);
+      sendJson(res, 200, { ok: true, message: '站長密碼修改成功！新密碼已立即生效。', token: newPass });
+      return true;
+    } catch (err: any) {
+      sendJson(res, 500, { ok: false, error: err?.message });
+      return true;
+    }
+  }
+
   // 5. 站長後台：讀取完整後台統計與設定
   if (pathname === '/api/admin/dashboard' && req.method === 'GET') {
     const store = loadStore();
+    if (!isAuthorizedAdmin(req, store)) {
+      sendJson(res, 401, { ok: false, error: '未授權訪問！請先輸入站長密碼登入。' });
+      return true;
+    }
     sendJson(res, 200, {
       ok: true,
       subscribers: store.subscribers,
@@ -789,8 +851,12 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 6. 站長後台：儲存聯盟行銷連結與常駐折扣碼設定
   if (pathname === '/api/admin/affiliate' && req.method === 'POST') {
     try {
-      const body = await readJsonBody(req);
       const store = loadStore();
+      if (!isAuthorizedAdmin(req, store)) {
+        sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
+        return true;
+      }
+      const body = await readJsonBody(req);
       store.affiliateConfig = {
         klookUrl: String(body.klookUrl ?? store.affiliateConfig.klookUrl).trim(),
         kkdayUrl: String(body.kkdayUrl ?? store.affiliateConfig.kkdayUrl).trim(),
@@ -812,8 +878,12 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 7. 站長後台：儲存 Resend API Key 與寄件人設定
   if (pathname === '/api/admin/email-settings' && req.method === 'POST') {
     try {
-      const body = await readJsonBody(req);
       const store = loadStore();
+      if (!isAuthorizedAdmin(req, store)) {
+        sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
+        return true;
+      }
+      const body = await readJsonBody(req);
       if (typeof body.resendApiKey === 'string') {
         store.emailSettings.resendApiKey = body.resendApiKey.trim();
       }
@@ -835,8 +905,12 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 8. 站長後台：發布/關閉全站促銷特惠，並可選擇是否同時透過 Resend 群發通知信
   if (pathname === '/api/admin/promo' && req.method === 'POST') {
     try {
-      const body = await readJsonBody(req);
       const store = loadStore();
+      if (!isAuthorizedAdmin(req, store)) {
+        sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
+        return true;
+      }
+      const body = await readJsonBody(req);
 
       if (!body.active) {
         store.activePromo = null;

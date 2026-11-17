@@ -221,8 +221,14 @@ export default function App() {
   });
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
-  // 站長後台 Modal
-  const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
+  // 站長後台 Modal (支援 ?admin=1 直接開啟)
+  const [showAdminModal, setShowAdminModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('admin') === '1';
+    }
+    return false;
+  });
 
   // 模擬突發促銷狀態
   const [promoState, setPromoState] = useState<PromoState | null>(null);
