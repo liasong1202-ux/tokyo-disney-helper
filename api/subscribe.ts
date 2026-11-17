@@ -31,3 +31,4 @@ export default async function handler(req: any, res: any) {
     res.end(JSON.stringify({ ok: false, error: err?.message || '訂閱失敗' }));
   }
 }
+

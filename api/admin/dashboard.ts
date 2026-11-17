@@ -24,18 +24,8 @@ export default async function handler(req: any, res: any) {
   res.statusCode = 200;
   res.end(JSON.stringify({
     ok: true,
-    subscribers: [
-      {
-        id: 'sub-1',
-        email: 'disney_vip@example.com',
-        targetMonth: '2026-11',
-        targetPark: 'both',
-        alertType: 'both',
-        characterId: 'mickey',
-        createdAt: new Date().toISOString()
-      }
-    ],
-    clickCounts: { Klook: 48, KKday: 32, Official: 15 },
+    subscribers: [],
+    clickCounts: { Klook: 0, KKday: 0, Official: 0 },
     recentClicks: [],
     affiliateConfig: {
       klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/',
@@ -61,3 +51,4 @@ export default async function handler(req: any, res: any) {
     emailHistory: []
   }));
 }
+

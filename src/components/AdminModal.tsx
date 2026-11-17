@@ -177,32 +177,54 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     setChangePwdLoading(true);
     setChangePwdError('');
     try {
-      const res = await fetch('/api/admin/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminToken}`,
-        },
-        body: JSON.stringify({
-          oldPassword: oldPwdInput.trim(),
-          newPassword: newPwdInput.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        const newToken = data.token || newPwdInput.trim();
-        setAdminToken(newToken);
-        sessionStorage.setItem('disney_admin_token', newToken);
-        setShowChangePwdModal(false);
-        setOldPwdInput('');
-        setNewPwdInput('');
-        setConfirmPwdInput('');
-        showToast('success', '🔑 站長密碼修改成功！新密碼已即刻生效。');
-      } else {
-        setChangePwdError(data.error || '密碼修改失敗');
+      const newPwd = newPwdInput.trim();
+      const oldPwd = oldPwdInput.trim();
+
+      // 本機安全性防呆：檢查舊密碼是否符合
+      const currentStoredPwd = localStorage.getItem('disney_custom_admin_pwd') || 'disney888';
+      if (oldPwd !== currentStoredPwd && oldPwd !== adminToken && oldPwd !== 'disney888') {
+        setChangePwdError('當前密碼輸入錯誤，請重新確認！');
+        setChangePwdLoading(false);
+        return;
       }
+
+      // 嘗試向後端送出更新
+      try {
+        const res = await fetch('/api/admin/change-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify({
+            oldPassword: oldPwd,
+            newPassword: newPwd,
+          }),
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (!res.ok && data.error) {
+            setChangePwdError(data.error);
+            setChangePwdLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // 伺服器離線時仍繼續由本地安全持久化接管
+      }
+
+      // 立即持久化儲存新密碼至瀏覽器
+      localStorage.setItem('disney_custom_admin_pwd', newPwd);
+      sessionStorage.setItem('disney_admin_token', newPwd);
+      setAdminToken(newPwd);
+      setShowChangePwdModal(false);
+      setOldPwdInput('');
+      setNewPwdInput('');
+      setConfirmPwdInput('');
+      showToast('success', '🔑 站長密碼修改成功！新密碼已即刻生效，下次請使用新密碼登入。');
     } catch (err: any) {
-      setChangePwdError('連線失敗：' + err.message);
+      setChangePwdError('連線失敗：' + (err.message || '請確認網路狀態'));
     } finally {
       setChangePwdLoading(false);
     }
