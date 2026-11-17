@@ -180,14 +180,25 @@ export default function App() {
 
   const activeRate = selectedParkId === 'tokyo' ? exchangeRate : currentPark.defaultRate;
 
-  // 後端聯盟行銷連結與常駐優惠設定
-  const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>({
-    klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=YOUR_KLOOK_AID&utm_campaign=ticket_calendar',
-    kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=YOUR_KKDAY_CID&ud1=price_calendar',
-    officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
-    klookDefaultCode: 'DISNEYTW88',
-    klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
-    kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+  // 後端聯盟行銷連結與常駐優惠設定 (優先讀取站長自訂之持久化網址，永不重置)
+  const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>(() => {
+    const defaults: AffiliateConfig = {
+      klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=YOUR_KLOOK_AID&utm_campaign=ticket_calendar',
+      kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=YOUR_KKDAY_CID&ud1=price_calendar',
+      officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
+      klookDefaultCode: 'DISNEYTW88',
+      klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
+      kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+    };
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tokyo_disney_affiliate_config');
+      if (saved) {
+        try {
+          return { ...defaults, ...JSON.parse(saved) };
+        } catch {}
+      }
+    }
+    return defaults;
   });
 
   // 篩選標籤
@@ -230,8 +241,19 @@ export default function App() {
     return false;
   });
 
-  // 模擬突發促銷狀態
-  const [promoState, setPromoState] = useState<PromoState | null>(null);
+  // 促銷狀態 (優先讀取站長設定的持久化促銷，永遠記住最新狀態)
+  const [promoState, setPromoState] = useState<PromoState | null>(() => {
+    if (typeof window !== 'undefined') {
+      const savedPromo = localStorage.getItem('tokyo_disney_promo_state');
+      if (savedPromo) {
+        try {
+          const parsed = JSON.parse(savedPromo);
+          if (parsed && parsed.active) return parsed;
+        } catch {}
+      }
+    }
+    return null;
+  });
   const [showPushToast, setShowPushToast] = useState<boolean>(false);
   const [isPriceFlashing, setIsPriceFlashing] = useState<boolean>(false);
 
@@ -246,7 +268,14 @@ export default function App() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.affiliateConfig) {
-        setAffiliateConfig(data.affiliateConfig);
+        let localAff = {};
+        if (typeof window !== 'undefined') {
+          const raw = localStorage.getItem('tokyo_disney_affiliate_config');
+          if (raw) {
+            try { localAff = JSON.parse(raw); } catch {}
+          }
+        }
+        setAffiliateConfig(prev => ({ ...prev, ...data.affiliateConfig, ...localAff }));
       }
       if (data.exchangeRate && typeof data.exchangeRate.rate === 'number') {
         setExchangeRate(data.exchangeRate.rate);
@@ -255,7 +284,23 @@ export default function App() {
       if (typeof data.subscriberCount === 'number') {
         setSubscriberCount(data.subscriberCount);
       }
-      if (data.activePromo && data.activePromo.active) {
+      if (typeof window !== 'undefined') {
+        const localPromoRaw = localStorage.getItem('tokyo_disney_promo_state');
+        if (localPromoRaw) {
+          try {
+            const lp = JSON.parse(localPromoRaw);
+            if (lp) {
+              setPromoState(lp.active ? lp : null);
+              if (lp.active) setShowPushToast(true);
+            }
+          } catch {}
+        } else if (data.activePromo && data.activePromo.active) {
+          setPromoState(data.activePromo);
+          setShowPushToast(true);
+        } else {
+          setPromoState(null);
+        }
+      } else if (data.activePromo && data.activePromo.active) {
         setPromoState(data.activePromo);
         setShowPushToast(true);
       } else {
