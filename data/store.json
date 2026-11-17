@@ -1,0 +1,83 @@
+{
+  "subscribers": [
+    {
+      "id": "sub-1793719098308-ab7y",
+      "email": "liasong1202@gmail.com",
+      "targetMonth": "2027-01",
+      "targetPark": "land",
+      "alertType": "ticket_open",
+      "targetDate": "2027-01-15",
+      "saleOpenDate": "2026-11-15",
+      "createdAt": "2026-11-03T15:18:18.308Z"
+    },
+    {
+      "id": "sub-1793717417688-axh2",
+      "email": "liasong1202@gmail.com",
+      "targetMonth": "2027-01",
+      "targetPark": "both",
+      "createdAt": "2026-11-03T14:50:17.688Z"
+    },
+    {
+      "id": "demo-1",
+      "email": "disney_lover_demo@example.com",
+      "targetMonth": "2026-11",
+      "targetPark": "both",
+      "createdAt": "2026-11-03T14:46:20.528Z"
+    }
+  ],
+  "clicks": [
+    {
+      "id": "clk-1793718213396",
+      "platform": "Klook",
+      "dateStr": "2026-11-11",
+      "park": "land",
+      "ticketType": "adult",
+      "priceTwd": 1512,
+      "source": "web",
+      "timestamp": "2026-11-03T15:03:33.396Z"
+    }
+  ],
+  "clickCounts": {
+    "Klook": 1,
+    "KKday": 0,
+    "Official": 0
+  },
+  "affiliateConfig": {
+    "klookUrl": "https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=YOUR_KLOOK_AID&utm_campaign=ticket_calendar",
+    "kkdayUrl": "https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=YOUR_KKDAY_CID&ud1=price_calendar",
+    "officialUrl": "https://www.tokyodisneyresort.jp/tc/ticket/",
+    "klookDefaultCode": "DISNEYTW88",
+    "klookDefaultDesc": "結帳輸入優惠碼現省 NT$100",
+    "kkdayDefaultBonus": "購票即享日本高速 eSIM 1GB 體驗組"
+  },
+  "activePromo": {
+    "active": false,
+    "platform": "Klook",
+    "title": "Klook 限時狂歡！迪士尼門票限定快閃 85 折",
+    "code": "FLASH85DISNEY",
+    "discountRate": 0.85,
+    "fixedDiscountTwd": 50,
+    "badge": "Klook 限時 85 折快閃特惠",
+    "updatedAt": "2026-11-16T21:45:00.000Z"
+  },
+  "emailSettings": {
+    "resendApiKey": "re_RPTu3iWk_AeuwQWTXX9kKPc2L7ku41uaB",
+    "fromEmail": "onboarding@resend.dev",
+    "fromName": "東京迪士尼降價與人潮預報助手",
+    "adminPassword": "disney888"
+  },
+  "exchangeRateCache": {
+    "rate": 0.2066,
+    "updatedAt": "2026-11-17T12:42:15.180Z",
+    "source": "國際即時匯率 API (自動同步)"
+  },
+  "emailHistory": [
+    {
+      "id": "mail-1793719220048",
+      "subject": "⚡ 降價通知：Klook 突發補貼！日本迪士尼限定快閃 85 折 (優惠碼 FLASH85DISNEY)",
+      "recipientCount": 2,
+      "sentAt": "2026-11-03T15:20:20.048Z",
+      "status": "成功寄出 2 封"
+    }
+  ]
+}

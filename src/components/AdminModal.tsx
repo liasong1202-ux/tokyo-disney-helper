@@ -1,0 +1,995 @@
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  BarChart3,
+  Link2,
+  Send,
+  Users,
+  KeyRound,
+  Download,
+  CheckCircle2,
+  Trash2,
+  RefreshCw,
+  ExternalLink,
+  Sparkles,
+  AlertCircle,
+  Zap,
+} from 'lucide-react';
+
+interface AdminModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onStateUpdated: () => void;
+}
+
+export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminModalProps) {
+  const [activeTab, setActiveTab] = useState<'stats' | 'promo' | 'affiliate' | 'subscribers' | 'resend'>('stats');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Dashboard 資料
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [clickCounts, setClickCounts] = useState<{ Klook: number; KKday: number; Official: number }>({
+    Klook: 0,
+    KKday: 0,
+    Official: 0,
+  });
+  const [recentClicks, setRecentClicks] = useState<any[]>([]);
+  const [emailHistory, setEmailHistory] = useState<any[]>([]);
+  const [exchangeRateCache, setExchangeRateCache] = useState<any>(null);
+
+  // 聯盟行銷表單
+  const [klookUrl, setKlookUrl] = useState('');
+  const [kkdayUrl, setKkdayUrl] = useState('');
+  const [officialUrl, setOfficialUrl] = useState('');
+  const [klookDefaultCode, setKlookDefaultCode] = useState('');
+  const [klookDefaultDesc, setKlookDefaultDesc] = useState('');
+  const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('');
+  const [lineOfficialUrl, setLineOfficialUrl] = useState('');
+
+  // 促銷特惠與群發信表單
+  const [promoActive, setPromoActive] = useState(false);
+  const [promoPlatform, setPromoPlatform] = useState<'Klook' | 'KKday'>('Klook');
+  const [promoTitle, setPromoTitle] = useState('Klook 突發降價！日本迪士尼限定快閃 85 折');
+  const [promoCode, setPromoCode] = useState('FLASH85DISNEY');
+  const [promoDiscountRate, setPromoDiscountRate] = useState(0.85);
+  const [promoFixedDiscount, setPromoFixedDiscount] = useState(50);
+  const [promoBadge, setPromoBadge] = useState('Klook 突發 85 折特惠');
+  const [sendEmailBroadcast, setSendEmailBroadcast] = useState(true);
+  const [customEmailMessage, setCustomEmailMessage] = useState(
+    '站長實測這波折扣碼剛釋出還有名額！建議挑選日曆上綠色（¥8,900~9,400）的平日入園，搭配折扣碼省最多！'
+  );
+
+  // Resend 設定表單
+  const [resendApiKey, setResendApiKey] = useState('');
+  const [fromEmail, setFromEmail] = useState('onboarding@resend.dev');
+  const [fromName, setFromName] = useState('東京迪士尼降價與人潮預報助手');
+  const [hasResendKey, setHasResendKey] = useState(false);
+  const [selectedAdminChar, setSelectedAdminChar] = useState<string>('mickey');
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToastMsg({ type, text });
+    setTimeout(() => setToastMsg(null), 5000);
+  };
+
+  const fetchDashboard = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/dashboard');
+      const data = await res.json();
+      if (data.ok) {
+        setSubscribers(data.subscribers || []);
+        setClickCounts(data.clickCounts || { Klook: 0, KKday: 0, Official: 0 });
+        setRecentClicks(data.recentClicks || []);
+        setEmailHistory(data.emailHistory || []);
+        setExchangeRateCache(data.exchangeRateCache || null);
+
+        if (data.affiliateConfig) {
+          setKlookUrl(data.affiliateConfig.klookUrl || '');
+          setKkdayUrl(data.affiliateConfig.kkdayUrl || '');
+          setOfficialUrl(data.affiliateConfig.officialUrl || '');
+          setKlookDefaultCode(data.affiliateConfig.klookDefaultCode || '');
+          setKlookDefaultDesc(data.affiliateConfig.klookDefaultDesc || '');
+          setKkdayDefaultBonus(data.affiliateConfig.kkdayDefaultBonus || '');
+          setLineOfficialUrl(data.affiliateConfig.lineOfficialUrl || '');
+        }
+
+        if (data.activePromo && data.activePromo.active) {
+          setPromoActive(true);
+          setPromoPlatform(data.activePromo.platform);
+          setPromoTitle(data.activePromo.title);
+          setPromoCode(data.activePromo.code);
+          setPromoDiscountRate(data.activePromo.discountRate);
+          setPromoFixedDiscount(data.activePromo.fixedDiscountTwd);
+          setPromoBadge(data.activePromo.badge);
+        } else {
+          setPromoActive(false);
+        }
+
+        if (data.emailSettings) {
+          setHasResendKey(data.emailSettings.hasResendKey);
+          setResendApiKey(data.emailSettings.resendApiKey || '');
+          setFromEmail(data.emailSettings.fromEmail || 'onboarding@resend.dev');
+          setFromName(data.emailSettings.fromName || '東京迪士尼降價與人潮預報助手');
+        }
+      }
+    } catch (e: any) {
+      showToast('error', '無法讀取後台資料：' + (e?.message || ''));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchDashboard();
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  // 儲存聯盟行銷設定
+  const handleSaveAffiliate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/affiliate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          klookUrl,
+          kkdayUrl,
+          officialUrl,
+          klookDefaultCode,
+          klookDefaultDesc,
+          kkdayDefaultBonus,
+          lineOfficialUrl,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('success', '✅ 聯盟行銷連結與常駐優惠已儲存！全站按鈕已立即更新！');
+        onStateUpdated();
+      } else {
+        showToast('error', data.error || '儲存失敗');
+      }
+    } catch {
+      showToast('error', '儲存失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 儲存 Resend API 設定
+  const handleSaveResend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/email-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resendApiKey,
+          fromEmail,
+          fromName,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setHasResendKey(Boolean(resendApiKey.trim()));
+        showToast('success', '✅ Resend 自動發信金鑰已儲存！');
+        fetchDashboard();
+      }
+    } catch {
+      showToast('error', '儲存失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 發布促銷特惠並群發通知信
+  const handlePublishPromo = async (activate: boolean) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/promo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          active: activate,
+          platform: promoPlatform,
+          title: promoTitle,
+          code: promoCode,
+          discountRate: Number(promoDiscountRate),
+          fixedDiscountTwd: Number(promoFixedDiscount),
+          badge: promoBadge,
+          sendEmailBroadcast: activate && sendEmailBroadcast,
+          customEmailMessage,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPromoActive(activate);
+        onStateUpdated();
+        fetchDashboard();
+        if (!activate) {
+          showToast('success', '已關閉限時特惠，全站日曆已恢復正常定價。');
+        } else if (data.emailBroadcastResult?.attempted) {
+          if (data.emailBroadcastResult.error) {
+            showToast('error', `全站特惠已生效！但信件提醒：${data.emailBroadcastResult.error}`);
+          } else {
+            showToast(
+              'success',
+              `🎉 全站降價特惠已生效！並成功透過 Resend 寄出 ${data.emailBroadcastResult.sentCount} 封通知信！`
+            );
+          }
+        } else {
+          showToast('success', '🎉 全站降價特惠已生效！所有訪客日曆已同步降價！');
+        }
+      }
+    } catch {
+      showToast('error', '執行失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 匯出訂閱者 CSV (Excel 可直接打開)
+  const handleExportCsv = () => {
+    const headers = ['Email信箱', '通知類型', '指定入園日/月份', '預計開賣日', '目標園區', '訂閱時間'];
+    const rows = subscribers.map((s) => [
+      s.email,
+      s.alertType === 'ticket_open' || s.targetDate ? '預約開賣通知' : s.alertType === 'promo' ? '降價特惠通知' : '開賣+降價皆通知',
+      s.targetDate || s.targetMonth || '全部',
+      s.saleOpenDate || '已開賣',
+      s.targetPark === 'land' ? '陸地' : s.targetPark === 'sea' ? '海洋' : '兩園皆可',
+      new Date(s.createdAt).toLocaleString('zh-TW'),
+    ]);
+    const csvContent =
+      '\uFEFF' + [headers.join(','), ...rows.map((r) => r.map((v) => `"${v}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `disney_subscribers_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // 發送「門票正式開賣通知信」
+  const handleSendTicketOpenAlert = async (subscriberId?: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/send-open-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriberId, characterId: selectedAdminChar }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('success', `🎉 已成功透過 Resend 寄出 ${data.sentCount} 封「門票正式開賣通知信」！`);
+        fetchDashboard();
+      } else {
+        showToast('error', data.error || '寄送失敗');
+      }
+    } catch {
+      showToast('error', '發送失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 刪除訂閱者
+  const handleDeleteSubscriber = async (id: string) => {
+    await fetch('/api/admin/subscribers/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    fetchDashboard();
+    onStateUpdated();
+  };
+
+  // 手動刷新即時匯率
+  const handleRefreshRate = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/exchange-rate/refresh', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        setExchangeRateCache(data.exchangeRate);
+        onStateUpdated();
+        showToast('success', `✅ 已同步最新日圓匯率：${data.exchangeRate.rate}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalClicks = (clickCounts.Klook || 0) + (clickCounts.KKday || 0) + (clickCounts.Official || 0);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+        {/* 頂部標題列 */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🛠️</span>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
+                <span>站長專屬後台管理中心</span>
+                <span className="text-[11px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full">
+                  聯盟行銷 & 自動通知
+                </span>
+              </h2>
+              <p className="text-xs text-slate-300">
+                隨時修改 Klook/KKday 分潤連結、發送全站降價特惠信、查看點擊轉換與匯出名單
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* 導覽分頁 Tabs */}
+        <div className="bg-slate-100 px-4 sm:px-6 pt-3 flex items-center gap-2 overflow-x-auto border-b border-slate-200 shrink-0">
+          {[
+            { id: 'stats', label: '📊 點擊與成效總覽', icon: BarChart3 },
+            { id: 'affiliate', label: '🔗 聯盟行銷連結設定', icon: Link2 },
+            { id: 'promo', label: '⚡ 發布降價特惠 & 群發信', icon: Send },
+            { id: 'subscribers', label: `👥 訂閱名單 (${subscribers.length})`, icon: Users },
+            { id: 'resend', label: '🔑 Resend 寄信設定', icon: KeyRound },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2.5 text-xs sm:text-sm font-bold rounded-t-xl flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer border-b-2 ${
+                  active
+                    ? 'bg-white text-indigo-700 border-indigo-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 border-transparent hover:bg-white/50'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 提示訊息橫幅 */}
+        {toastMsg && (
+          <div
+            className={`mx-6 mt-4 p-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shrink-0 ${
+              toastMsg.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                : 'bg-rose-50 text-rose-800 border border-rose-300'
+            }`}
+          >
+            {toastMsg.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{toastMsg.text}</span>
+          </div>
+        )}
+
+        {/* 內容區域 */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* TAB 1: 點擊與成效總覽 */}
+          {activeTab === 'stats' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+                  <div className="text-xs font-bold text-orange-700">Klook 聯盟按鈕點擊</div>
+                  <div className="text-3xl font-black text-orange-950 mt-1 tabular-nums">
+                    {clickCounts.Klook || 0} <span className="text-xs font-normal">次</span>
+                  </div>
+                  <div className="text-[11px] text-orange-600 mt-1">主力高分潤導購通道</div>
+                </div>
+
+                <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
+                  <div className="text-xs font-bold text-sky-700">KKday 聯盟按鈕點擊</div>
+                  <div className="text-3xl font-black text-sky-950 mt-1 tabular-nums">
+                    {clickCounts.KKday || 0} <span className="text-xs font-normal">次</span>
+                  </div>
+                  <div className="text-[11px] text-sky-600 mt-1">送網卡方案導購通道</div>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+                  <div className="text-xs font-bold text-indigo-700">已收集訂閱者名單</div>
+                  <div className="text-3xl font-black text-indigo-950 mt-1 tabular-nums">
+                    {subscribers.length} <span className="text-xs font-normal">人</span>
+                  </div>
+                  <div className="text-[11px] text-indigo-600 mt-1">可隨時發送降價推播信</div>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-700">即時日圓匯率</span>
+                    <button
+                      onClick={handleRefreshRate}
+                      className="text-[11px] text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" /> 刷新
+                    </button>
+                  </div>
+                  <div className="text-3xl font-black text-emerald-950 mt-1 tabular-nums">
+                    {exchangeRateCache?.rate || 0.215}
+                  </div>
+                  <div className="text-[11px] text-emerald-600 mt-1 truncate">
+                    {exchangeRateCache?.source || '自動同步中'}
+                  </div>
+                </div>
+              </div>
+
+              {/* 最近點擊紀錄 */}
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    🖱️ 訪客最近點擊購票紀錄（共 {totalClicks} 次點擊）
+                  </h3>
+                  <button
+                    onClick={fetchDashboard}
+                    className="text-xs text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> 重新整理
+                  </button>
+                </div>
+
+                {recentClicks.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-4 text-center">
+                    目前還沒有點擊紀錄。您可以回前台點擊「前往 Klook 購票」或「前往 KKday 預訂」測試看看！
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto max-h-56">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-200/70 text-slate-700">
+                        <tr>
+                          <th className="p-2 rounded-l-lg">點擊時間</th>
+                          <th className="p-2">導購平台</th>
+                          <th className="p-2">查看入園日期</th>
+                          <th className="p-2">園區 / 票種</th>
+                          <th className="p-2 rounded-r-lg">當下顯示台幣</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {recentClicks.map((clk) => (
+                          <tr key={clk.id} className="hover:bg-white">
+                            <td className="p-2 text-slate-500">
+                              {new Date(clk.timestamp).toLocaleString('zh-TW')}
+                            </td>
+                            <td className="p-2 font-bold">
+                              <span
+                                className={`px-2 py-0.5 rounded text-white ${
+                                  clk.platform === 'Klook'
+                                    ? 'bg-orange-500'
+                                    : clk.platform === 'KKday'
+                                    ? 'bg-sky-600'
+                                    : 'bg-slate-700'
+                                }`}
+                              >
+                                {clk.platform}
+                              </span>
+                            </td>
+                            <td className="p-2 font-mono font-bold text-slate-800">{clk.dateStr}</td>
+                            <td className="p-2 text-slate-600">
+                              {clk.park === 'land' ? '🏰 陸地' : '🌋 海洋'} ·{' '}
+                              {clk.ticketType === 'adult' ? '成人' : clk.ticketType === 'junior' ? '學生' : '兒童'}
+                            </td>
+                            <td className="p-2 font-bold text-emerald-700">
+                              NT$ {Number(clk.priceTwd).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: 聯盟行銷連結設定 */}
+          {activeTab === 'affiliate' && (
+            <form onSubmit={handleSaveAffiliate} className="space-y-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 space-y-1">
+                <div className="font-bold text-sm">💡 站長小撇步：如何換成您自己的分潤連結？</div>
+                <p>
+                  當您申請好 <strong>Klook 聯盟行銷 (Klook Affiliate)</strong> 或{' '}
+                  <strong>KKday 聯盟夥伴 (KKday Affiliate)</strong> 後，把他們給您的「東京迪士尼門票推廣網址」直接貼在下方並按儲存，全網站與通知信裡的所有按鈕就會自動幫您賺取分潤獎金！
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    🟠 Klook 東京迪士尼門票「聯盟行銷專屬連結」
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={klookUrl}
+                    onChange={(e) => setKlookUrl(e.target.value)}
+                    placeholder="https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=您的代碼"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      🟠 Klook 常駐顯示優惠碼
+                    </label>
+                    <input
+                      type="text"
+                      value={klookDefaultCode}
+                      onChange={(e) => setKlookDefaultCode(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono font-bold text-orange-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      🟠 Klook 常駐優惠說明文案
+                    </label>
+                    <input
+                      type="text"
+                      value={klookDefaultDesc}
+                      onChange={(e) => setKlookDefaultDesc(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <hr className="border-slate-200" />
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    🔵 KKday 東京迪士尼門票「聯盟行銷專屬連結」
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={kkdayUrl}
+                    onChange={(e) => setKkdayUrl(e.target.value)}
+                    placeholder="https://www.kkday.com/zh-tw/product/19252?cid=您的代碼"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    🔵 KKday 常駐加贈優惠文案
+                  </label>
+                  <input
+                    type="text"
+                    value={kkdayDefaultBonus}
+                    onChange={(e) => setKkdayDefaultBonus(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                  />
+                </div>
+
+                <hr className="border-slate-200" />
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span className="text-[#06C755] font-extrabold flex items-center gap-1.5">
+                      <span>🟢 LINE 官方帳號加好友連結 (免寫程式，開賣/降價推播最快)</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-normal">留空則提示尚未開放</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={lineOfficialUrl}
+                    onChange={(e) => setLineOfficialUrl(e.target.value)}
+                    placeholder="https://line.me/R/ti/p/@你的LINE官方帳號ID"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#06C755] font-mono"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    💡 使用者點擊「加 LINE 接收開賣/降價通知」即會自動打開 LINE 加好友。開賣時您可直接用手機 LINE 官方帳號後台發送推播！
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                💾 儲存聯盟行銷連結設定（全站立即生效）
+              </button>
+            </form>
+          )}
+
+          {/* TAB 3: 發布降價特惠 & 群發通知信 */}
+          {activeTab === 'promo' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between bg-slate-100 p-4 rounded-2xl border border-slate-200">
+                <div>
+                  <div className="text-xs font-bold text-slate-500">目前全站促銷特惠狀態</div>
+                  <div className="text-base font-black mt-0.5 flex items-center gap-2">
+                    {promoActive ? (
+                      <span className="text-emerald-600 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4" /> 🔥 全站限時特惠生效中 ({promoTitle})
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">⚪ 一般日常票價模式（無突發降價）</span>
+                    )}
+                  </div>
+                </div>
+                {promoActive && (
+                  <button
+                    onClick={() => handlePublishPromo(false)}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                  >
+                    結束特惠 / 恢復原價
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">促銷平台</label>
+                  <select
+                    value={promoPlatform}
+                    onChange={(e) => {
+                      const p = e.target.value as 'Klook' | 'KKday';
+                      setPromoPlatform(p);
+                      if (p === 'Klook') {
+                        setPromoTitle('Klook 突發降價！日本迪士尼限定快閃 85 折');
+                        setPromoCode('FLASH85DISNEY');
+                        setPromoBadge('Klook 突發 85 折特惠');
+                      } else {
+                        setPromoTitle('KKday 狂歡慶！雙人同行限時快閃 85 折特惠');
+                        setPromoCode('DISNEYKK85');
+                        setPromoBadge('KKday 限時特惠');
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl font-bold"
+                  >
+                    <option value="Klook">🟠 Klook 客路</option>
+                    <option value="KKday">🔵 KKday</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">專屬優惠碼 (Promo Code)</label>
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono font-bold text-emerald-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">促銷活動主標題（會顯示在網站橫幅與通知信標題）</label>
+                <input
+                  type="text"
+                  value={promoTitle}
+                  onChange={(e) => setPromoTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl font-bold"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    折扣比例 (例如 0.85 代表 85 折，1 代表不打折)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.5"
+                    max="1"
+                    value={promoDiscountRate}
+                    onChange={(e) => setPromoDiscountRate(parseFloat(e.target.value) || 1)}
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    額外現折台幣金額 (NT$)
+                  </label>
+                  <input
+                    type="number"
+                    value={promoFixedDiscount}
+                    onChange={(e) => setPromoFixedDiscount(parseInt(e.target.value, 10) || 0)}
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 space-y-3">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sendEmailBroadcast}
+                    onChange={(e) => setSendEmailBroadcast(e.target.checked)}
+                    className="w-4 h-4 accent-indigo-600 rounded"
+                  />
+                  <span className="text-xs sm:text-sm font-black text-indigo-950">
+                    📩 發布時，同時透過 Resend 自動寄發「降價通知信（含聯盟行銷購票按鈕）」給所有訂閱者
+                  </span>
+                </label>
+
+                {sendEmailBroadcast && (
+                  <div>
+                    <label className="block text-xs font-bold text-indigo-900 mb-1">
+                      信件內附加的站長悄悄話 / 購票提醒：
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={customEmailMessage}
+                      onChange={(e) => setCustomEmailMessage(e.target.value)}
+                      className="w-full p-2.5 text-xs bg-white border border-indigo-200 rounded-xl"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handlePublishPromo(true)}
+                className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Zap className="w-4 h-4" />
+                <span>
+                  {sendEmailBroadcast
+                    ? '🚀 立即發布全站降價特惠 ＋ 群發 Email 通知所有訂閱者'
+                    : '🚀 立即發布全站降價特惠（僅更新網站日曆）'}
+                </span>
+              </button>
+
+              {emailHistory.length > 0 && (
+                <div className="pt-3 border-t border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-700 mb-2">📬 最近發信紀錄</h4>
+                  <div className="space-y-1.5">
+                    {emailHistory.slice(0, 5).map((item) => (
+                      <div
+                        key={item.id}
+                        className="text-xs bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 flex items-center justify-between"
+                      >
+                        <span className="font-medium text-slate-800 truncate">{item.subject}</span>
+                        <span className="text-slate-500 shrink-0 ml-2">
+                          {item.status} · {new Date(item.sentAt).toLocaleTimeString('zh-TW')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: 訂閱名單管理 */}
+          {activeTab === 'subscribers' && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    目前已收集 {subscribers.length} 位訂閱者名單
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    包含「⚡ 降價特惠通知」與「🎟️ 尚未開賣日期開放訂票通知」名單。當日期一開放預訂，可一鍵寄信通知對方預約購票！
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-600 pl-1">發信角色:</span>
+                    <select
+                      value={selectedAdminChar}
+                      onChange={(e) => setSelectedAdminChar(e.target.value)}
+                      className="text-xs font-bold bg-white border border-slate-300 rounded-lg px-2 py-1"
+                    >
+                      <option value="mickey">👑 米奇 (Mickey)</option>
+                      <option value="minnie">💖 米妮 (Minnie)</option>
+                      <option value="donald">⚡ 唐老鴨 (Donald)</option>
+                      <option value="duffy">🧸 達菲熊 (Duffy)</option>
+                      <option value="pooh">🍯 小熊維尼 (Pooh)</option>
+                    </select>
+                  </div>
+                  <a
+                    href={`/api/admin/preview-open-email?raw=1&char=${selectedAdminChar}&date=2027-01-15`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-extrabold rounded-xl border border-indigo-200 flex items-center gap-1 transition-colors"
+                  >
+                    <span>👀 預覽信件樣式</span>
+                  </a>
+                  <button
+                    onClick={() => handleSendTicketOpenAlert()}
+                    disabled={loading}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>🎟️ 群發開賣通知信</span>
+                  </button>
+                  <button
+                    onClick={handleExportCsv}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>匯出 CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 text-slate-700 font-bold">
+                    <tr>
+                      <th className="p-3">訂閱者 Email</th>
+                      <th className="p-3">通知類型</th>
+                      <th className="p-3">指定入園日</th>
+                      <th className="p-3">守護角色</th>
+                      <th className="p-3">預計開賣日</th>
+                      <th className="p-3">關注園區</th>
+                      <th className="p-3 text-right">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {subscribers.map((sub) => {
+                      const isTicketOpen = sub.alertType === 'ticket_open' || Boolean(sub.targetDate);
+                      const charName =
+                        sub.characterId === 'minnie'
+                          ? '💖 米妮'
+                          : sub.characterId === 'donald'
+                          ? '⚡ 唐老鴨'
+                          : sub.characterId === 'duffy'
+                          ? '🧸 達菲熊'
+                          : sub.characterId === 'pooh'
+                          ? '🍯 小熊維尼'
+                          : '👑 米奇';
+                      return (
+                        <tr key={sub.id} className="hover:bg-slate-50">
+                          <td className="p-3 font-bold text-slate-900">{sub.email}</td>
+                          <td className="p-3">
+                            {isTicketOpen ? (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
+                                🎟️ 預約開賣提醒
+                              </span>
+                            ) : sub.alertType === 'promo' ? (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                                ⚡ 降價特惠通知
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold">
+                                🔥 開賣＋降價皆通知
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 font-mono font-bold text-slate-800">
+                            {sub.targetDate || sub.targetMonth || '不限月份'}
+                          </td>
+                          <td className="p-3 font-bold text-slate-700">
+                            <span className="px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200">
+                              {charName}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-600">
+                            {sub.saleOpenDate ? (
+                              <span className="text-orange-600 font-bold">{sub.saleOpenDate} 13:00</span>
+                            ) : (
+                              <span className="text-emerald-600">🟢 已開賣</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-slate-600">
+                            {sub.targetPark === 'land'
+                              ? '🏰 陸地'
+                              : sub.targetPark === 'sea'
+                              ? '🌋 海洋'
+                              : '🏰+🌋 兩園'}
+                          </td>
+                          <td className="p-3 text-right whitespace-nowrap space-x-2">
+                            <button
+                              onClick={() => handleSendTicketOpenAlert(sub.id)}
+                              disabled={loading}
+                              className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg cursor-pointer"
+                              title="立即寄發「門票已開放訂票」通知信給此用戶"
+                            >
+                              📩 寄開賣通知
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSubscriber(sub.id)}
+                              className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
+                              title="刪除此訂閱者"
+                            >
+                              <Trash2 className="w-4 h-4 inline" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: Resend 寄信設定 */}
+          {activeTab === 'resend' && (
+            <form onSubmit={handleSaveResend} className="space-y-5">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-xs text-indigo-950 space-y-2">
+                <div className="font-black text-sm flex items-center justify-between">
+                  <span>📬 如何免費取得 Resend API Key？（每月免費寄 3,000 封信）</span>
+                  <a
+                    href="https://resend.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:underline flex items-center gap-1"
+                  >
+                    前往 Resend 官網 <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-indigo-900">
+                  <li>點右上角前往 <strong>Resend.com</strong> 用 Google 或 GitHub 帳號免費註冊登入。</li>
+                  <li>點左側選單的 <strong>API Keys</strong> 👉 點 <strong>Create API Key</strong>。</li>
+                  <li>把產生的那串 <code>re_xxxxxxxxx</code> 開頭的金鑰複製起來，貼到下方欄位按儲存即可！</li>
+                </ol>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    🔑 Resend API Key {hasResendKey && <span className="text-emerald-600">(✅ 已設定)</span>}
+                  </label>
+                  <input
+                    type="password"
+                    value={resendApiKey}
+                    onChange={(e) => setResendApiKey(e.target.value)}
+                    placeholder="re_123456789_abcdefghijklmnop..."
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      寄件人顯示名稱
+                    </label>
+                    <input
+                      type="text"
+                      value={fromName}
+                      onChange={(e) => setFromName(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      寄件信箱 (免費測試用預設 onboarding@resend.dev 即可)
+                    </label>
+                    <input
+                      type="text"
+                      value={fromEmail}
+                      onChange={(e) => setFromEmail(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                💾 儲存 Resend 寄信設定
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
