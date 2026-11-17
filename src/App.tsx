@@ -1139,7 +1139,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16 w-full max-w-full overflow-x-hidden">
       {/* 模擬即時推播橫幅 Toast (當突發促銷觸發時跳出) */}
       {showPushToast && promoState && promoState.active && (
         <div className="fixed bottom-6 right-6 z-50 max-w-md bg-slate-900 text-white rounded-2xl p-4 shadow-2xl border-2 border-emerald-400 flex items-start gap-3.5 animate-in slide-in-from-bottom duration-300">
@@ -1173,19 +1173,19 @@ export default function App() {
       )}
 
       {/* 頂部導航列 */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:h-16 flex flex-wrap items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 w-full max-w-full overflow-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
           {/* Zone 1: 品牌標題與全球樂園快速切換器 */}
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
+            <div className="flex items-center gap-2 shrink-0">
               <span className="text-2xl" role="img" aria-label="castle">🏰</span>
               <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
                 {currentPark.name}門票降價助手
               </span>
             </div>
 
-            {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs">
+            {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) - 手機上橫向滾動支援 */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs overflow-x-auto max-w-full scrollbar-none py-1">
               {PARKS_LIST.map((park) => {
                 const isActive = park.id === selectedParkId;
                 return (
@@ -1193,7 +1193,7 @@ export default function App() {
                     key={park.id}
                     type="button"
                     onClick={() => handleParkSwitch(park.id)}
-                    className={`px-2.5 py-1 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    className={`px-2.5 py-1 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-xs scale-102'
                         : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
@@ -1227,9 +1227,9 @@ export default function App() {
           </nav>
 
           {/* Zone 3: 正式商用頂部快捷導航（即時匯率 + 開賣通知 + LINE 推播） */}
-          <div className="flex items-center gap-2.5 shrink-0 ml-auto sm:ml-0">
+          <div className="flex items-center gap-2 overflow-x-auto max-w-full scrollbar-none py-0.5 md:py-0 w-full md:w-auto justify-start md:justify-end">
             {/* 動態多幣別即時匯率牌告膠囊 */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs shrink-0 whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>{currentPark.flag} {currentPark.ratePrefix} ≈ NT$ {activeRate.toFixed(selectedParkId === 'tokyo' ? 4 : 2)}</span>
             </div>
@@ -1239,7 +1239,7 @@ export default function App() {
               href={affiliateConfig.lineOfficialUrl || '#subscribe'}
               target={affiliateConfig.lineOfficialUrl ? '_blank' : '_self'}
               rel="noopener noreferrer"
-              className="px-3.5 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
+              className="px-3 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer shrink-0"
             >
               <span>💬</span>
               <span>LINE 通知</span>
@@ -1248,7 +1248,7 @@ export default function App() {
             {/* 直達開賣預約 */}
             <a
               href="#subscribe"
-              className="px-3.5 py-1.5 text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all rounded-xl flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+              className="px-3 py-1.5 text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all rounded-xl flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0"
             >
               <Bell className="w-3.5 h-3.5 text-indigo-600" />
               <span>開賣提醒</span>
@@ -1257,7 +1257,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 space-y-6 w-full max-w-full overflow-hidden">
 
         {/* 🔔 核心功能 1：【平台促銷降價・立馬通知我】訂閱核心卡片 */}
         <section id="subscribe" className={`bg-gradient-to-r ${currentPark.gradient} text-white rounded-3xl p-6 sm:p-7 shadow-xl border-2 border-indigo-500/40 relative overflow-hidden transition-all duration-300`}>
@@ -1567,19 +1567,27 @@ export default function App() {
             </div>
           </div>
 
-          {/* 星期表頭 */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 text-center font-bold text-xs sm:text-sm">
-            <div className="py-2.5 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">週日 (Sun)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週一 (Mon)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週二 (Tue)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週三 (Wed)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週四 (Thu)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週五 (Fri)</div>
-            <div className="py-2.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">週六 (Sat)</div>
-          </div>
+          {/* 日曆網格容器：手機版提供流暢左右橫向滾動，桌機版滿版自適應 */}
+          <div className="space-y-1">
+            <div className="flex sm:hidden items-center justify-between text-[11px] text-slate-500 font-medium px-1 mb-1">
+              <span>👉 左右滑動日曆可查看一週 7 天完整票價</span>
+              <span className="text-indigo-600 font-bold">左右滑動 ↔</span>
+            </div>
+            <div className="overflow-x-auto pb-3 -mx-2 px-2 sm:mx-0 sm:px-0">
+              <div className="min-w-[580px] sm:min-w-full space-y-2">
+                {/* 星期表頭 */}
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 text-center font-bold text-xs sm:text-sm">
+                  <div className="py-2.5 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">週日 (Sun)</div>
+                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週一 (Mon)</div>
+                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週二 (Tue)</div>
+                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週三 (Wed)</div>
+                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週四 (Thu)</div>
+                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週五 (Fri)</div>
+                  <div className="py-2.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">週六 (Sat)</div>
+                </div>
 
-          {/* 日曆網格 (Grid View) */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5">
+                {/* 日曆網格 (Grid View) */}
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5">
             {/* 月初前的空白格子 */}
             {Array.from({ length: firstDayWeekday }).map((_, idx) => (
               <div
@@ -1682,6 +1690,9 @@ export default function App() {
                 </div>
               );
             })}
+          </div>
+              </div>
+            </div>
           </div>
         </section>
 

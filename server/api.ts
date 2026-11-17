@@ -3,8 +3,19 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import type { IncomingMessage, ServerResponse } from 'http';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.resolve(__dirname, '../data');
+// 跨環境安全取得路徑 (相容 ESM、CommonJS 與 Vercel Serverless)
+let resolvedDir = process.cwd();
+try {
+  if (typeof __dirname !== 'undefined') {
+    resolvedDir = __dirname;
+  } else if (typeof import.meta !== 'undefined' && import.meta?.url) {
+    resolvedDir = path.dirname(fileURLToPath(import.meta.url));
+  }
+} catch {
+  resolvedDir = process.cwd();
+}
+
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.resolve(resolvedDir, '../data');
 const DB_FILE = path.join(DATA_DIR, 'store.json');
 
 export interface Subscriber {
@@ -217,18 +228,31 @@ const DEFAULT_STORE: StoreData = {
   emailHistory: [],
 };
 
+// 記憶體備援快取 (防止在 Serverless 唯讀或冷啟動環境下噴錯)
+let memoryStore: StoreData = structuredClone(DEFAULT_STORE);
+
 export function loadStore(): StoreData {
   try {
     if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      } catch {
+        // 在無權限建立目錄時直接返回記憶體備援
+        return memoryStore;
+      }
     }
     if (!fs.existsSync(DB_FILE)) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(DEFAULT_STORE, null, 2), 'utf-8');
-      return structuredClone(DEFAULT_STORE);
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(DEFAULT_STORE, null, 2), 'utf-8');
+      } catch {
+        return memoryStore;
+      }
+      memoryStore = structuredClone(DEFAULT_STORE);
+      return memoryStore;
     }
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
-    return {
+    const result: StoreData = {
       ...DEFAULT_STORE,
       ...parsed,
       affiliateConfig: { ...DEFAULT_STORE.affiliateConfig, ...(parsed.affiliateConfig || {}) },
@@ -239,20 +263,27 @@ export function loadStore(): StoreData {
       },
       clickCounts: { ...DEFAULT_STORE.clickCounts, ...(parsed.clickCounts || {}) },
     };
+    memoryStore = result;
+    return result;
   } catch (err) {
-    console.error('Failed to load store:', err);
-    return structuredClone(DEFAULT_STORE);
+    console.warn('Failed to load store from disk, using memory store:', err);
+    return memoryStore;
   }
 }
 
 export function saveStore(data: StoreData): void {
+  memoryStore = data;
   try {
     if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      } catch {
+        return;
+      }
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Failed to save store:', err);
+    console.warn('Failed to save store to disk, persisted in memory:', err);
   }
 }
 
@@ -587,22 +618,49 @@ export function buildTicketOpenEmailHtml(
 </html>`;
 }
 
-// 解析 Request JSON Body
-function readJsonBody(req: IncomingMessage): Promise<any> {
-  return new Promise((resolve, reject) => {
+// 解析 Request JSON Body (支援 Node 原生串流、Express 與 Vercel Serverless pre-parsed body)
+async function readJsonBody(req: IncomingMessage): Promise<any> {
+  const reqAny = req as any;
+  if (reqAny.body !== undefined && reqAny.body !== null) {
+    if (typeof reqAny.body === 'object') {
+      return reqAny.body;
+    }
+    if (typeof reqAny.body === 'string' && reqAny.body.trim()) {
+      try {
+        return JSON.parse(reqAny.body);
+      } catch {
+        return {};
+      }
+    }
+  }
+
+  return new Promise((resolve) => {
     let body = '';
+    // 防呆超時：若在 Serverless 環境中 stream 已被消費，1.5 秒內強制結束防卡死
+    const timer = setTimeout(() => {
+      if (body) {
+        try { resolve(JSON.parse(body)); } catch { resolve({}); }
+      } else {
+        resolve({});
+      }
+    }, 1500);
+
     req.on('data', (chunk) => {
       body += chunk.toString();
     });
     req.on('end', () => {
+      clearTimeout(timer);
       if (!body) return resolve({});
       try {
         resolve(JSON.parse(body));
-      } catch (e) {
-        reject(e);
+      } catch {
+        resolve({});
       }
     });
-    req.on('error', reject);
+    req.on('error', () => {
+      clearTimeout(timer);
+      resolve({});
+    });
   });
 }
 
@@ -613,8 +671,25 @@ function sendJson(res: ServerResponse, status: number, payload: any) {
 }
 
 export async function handleApiRequest(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
-  const urlObj = new URL(req.url || '/', 'http://localhost');
-  const pathname = urlObj.pathname;
+  const reqUrl = req.url || '/';
+  const urlObj = new URL(reqUrl, 'http://localhost');
+  let pathname = urlObj.pathname;
+
+  // 跨環境解析：當 Vercel rewrite 轉發至 /api 時，提取實際 API 路由
+  const matchedPath = (req.headers['x-matched-path'] as string) || (req.headers['x-now-route-matches'] as string) || '';
+  if (pathname === '/api' || pathname === '/api/') {
+    const queryPath = urlObj.searchParams.get('path') || (req as any).query?.path;
+    if (queryPath) {
+      pathname = queryPath.startsWith('/') ? `/api${queryPath}` : `/api/${queryPath}`;
+    } else if (matchedPath && matchedPath.startsWith('/api/')) {
+      pathname = matchedPath;
+    }
+  }
+
+  // 移除尾部斜線
+  if (pathname.length > 5 && pathname.endsWith('/')) {
+    pathname = pathname.slice(0, -1);
+  }
 
   if (!pathname.startsWith('/api/')) {
     return false;
