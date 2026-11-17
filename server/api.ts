@@ -1,21 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import type { IncomingMessage, ServerResponse } from 'http';
 
-// 跨環境安全取得路徑 (相容 ESM、CommonJS 與 Vercel Serverless)
-let resolvedDir = process.cwd();
-try {
-  if (typeof __dirname !== 'undefined') {
-    resolvedDir = __dirname;
-  } else if (typeof import.meta !== 'undefined' && import.meta?.url) {
-    resolvedDir = path.dirname(fileURLToPath(import.meta.url));
-  }
-} catch {
-  resolvedDir = process.cwd();
-}
-
-const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.resolve(resolvedDir, '../data');
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'store.json');
 
 export interface Subscriber {
@@ -1199,4 +1186,17 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
   sendJson(res, 404, { ok: false, error: '找不到此 API 路徑' });
   return true;
+}
+
+
+export default async function handler(req: any, res: any) {
+  try {
+    const handled = await handleApiRequest(req, res);
+    if (!handled) {
+      sendJson(res, 404, { ok: false, error: 'API Not Found' });
+    }
+  } catch (err: any) {
+    console.error('API Error:', err);
+    sendJson(res, 500, { ok: false, error: err?.message || 'Server error' });
+  }
 }
