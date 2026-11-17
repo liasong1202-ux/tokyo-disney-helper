@@ -41,11 +41,12 @@ export default async function handler(req: any, res: any) {
     const inputPassword = String(body?.password || '').trim();
     const expectedPassword = process.env.ADMIN_PASSWORD || 'disney888';
 
-    if (inputPassword && inputPassword === expectedPassword) {
+    // 支援初始密碼 disney888、環境變數密碼與站長設定之密碼
+    if (inputPassword && (inputPassword === expectedPassword || inputPassword === 'disney888' || inputPassword === '781202')) {
       res.statusCode = 200;
       res.end(JSON.stringify({
         ok: true,
-        token: expectedPassword,
+        token: inputPassword,
         message: '站長身份驗證成功！'
       }));
     } else {
