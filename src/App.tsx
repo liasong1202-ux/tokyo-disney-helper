@@ -147,6 +147,19 @@ export default function App() {
   });
 
   const currentPark = DISNEY_PARKS[selectedParkId] || DISNEY_PARKS.tokyo;
+  // 動態同步瀏覽器分頁標題，對齊【方案1+方案4】
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const parkNames: Record<DisneyParkId, string> = {
+      tokyo: '東京迪士尼門票情報',
+      hongkong: '香港迪士尼門票情報',
+      shanghai: '上海迪士尼門票情報',
+      usa: '加州迪士尼門票情報',
+    };
+    const parkTitle = parkNames[selectedParkId] || '海外樂園門票情報';
+    document.title = `${parkTitle} - 即時低價日曆・開賣提醒・人潮預報【海外樂園情報站】`;
+  }, [selectedParkId]);
+
 
   // 分園/焦點分區選擇 (各國分園皆可點選切換：東京陸地/海洋；香港全園/魔雪奇緣；上海全園/動物城；美國雙園/奧蘭多)
   const [selectedSubParkIndex, setSelectedSubParkIndex] = useState<number>(() => {
@@ -1236,9 +1249,19 @@ export default function App() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-2xl" role="img" aria-label="castle">🏰</span>
-              <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
-                {currentPark.name}門票降價助手
-              </span>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-black text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
+                    {selectedParkId === 'tokyo' ? '東京迪士尼門票情報' :
+                     selectedParkId === 'hongkong' ? '香港迪士尼門票情報' :
+                     selectedParkId === 'shanghai' ? '上海迪士尼門票情報' :
+                     '加州迪士尼門票情報'}
+                  </span>
+                  <span className="hidden sm:inline-block text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-1.5 py-0.5 rounded-md font-bold">
+                    海外樂園門票情報
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) - 手機上橫向滾動支援 */}
@@ -1293,7 +1316,7 @@ export default function App() {
 
             {/* LINE 官方通知推播 */}
             <a
-              href={`https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent('您好！我想諮詢海外樂園門票最新促銷折扣碼與人潮情報 🎟️')}`}
+              href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer shrink-0"
@@ -1940,12 +1963,17 @@ export default function App() {
                         </div>
 
                         <a
-                          href={`https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent(`您好！我想預約 ${currentDayData.dateStr}【${currentPark.name}】開賣通知與早鳥特惠 🏰✨`)}`}
+                          href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => {
+                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                              navigator.clipboard.writeText(`您好！我想預約 ${currentDayData.dateStr}【${currentPark.name}】開賣通知與早鳥特惠 🏰✨`);
+                            }
+                          }}
                           className="w-full sm:w-auto px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
                         >
-                          <span>💬 點此用 LINE 預約</span>
+                          <span>💬 點此加入 LINE 預約</span>
                         </a>
                       </div>
 
