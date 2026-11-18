@@ -189,12 +189,18 @@ export default function App() {
       klookDefaultCode: 'DISNEYTW88',
       klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
       kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+      lineOfficialUrl: 'https://lin.ee/XnkEyyl',
     };
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tokyo_disney_affiliate_config');
       if (saved) {
         try {
-          return { ...defaults, ...JSON.parse(saved) };
+          const parsed = JSON.parse(saved);
+          return {
+            ...defaults,
+            ...parsed,
+            lineOfficialUrl: parsed.lineOfficialUrl && parsed.lineOfficialUrl.trim() ? parsed.lineOfficialUrl.trim() : defaults.lineOfficialUrl,
+          };
         } catch {}
       }
     }
@@ -275,7 +281,13 @@ export default function App() {
             try { localAff = JSON.parse(raw); } catch {}
           }
         }
-        setAffiliateConfig(prev => ({ ...prev, ...data.affiliateConfig, ...localAff }));
+        setAffiliateConfig(prev => {
+          const merged = { ...prev, ...data.affiliateConfig, ...localAff };
+          if (!merged.lineOfficialUrl || !merged.lineOfficialUrl.trim()) {
+            merged.lineOfficialUrl = 'https://lin.ee/XnkEyyl';
+          }
+          return merged;
+        });
       }
       if (data.exchangeRate && typeof data.exchangeRate.rate === 'number') {
         setExchangeRate(data.exchangeRate.rate);
@@ -1281,8 +1293,8 @@ export default function App() {
 
             {/* LINE 官方通知推播 */}
             <a
-              href={affiliateConfig.lineOfficialUrl || '#subscribe'}
-              target={affiliateConfig.lineOfficialUrl ? '_blank' : '_self'}
+              href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
+              target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer shrink-0"
             >
@@ -1403,15 +1415,10 @@ export default function App() {
                 <div className="pt-2 border-t border-white/15 flex items-center justify-between gap-2">
                   <span className="text-[11px] text-indigo-100 font-bold">📲 習慣用 LINE？</span>
                   <a
-                    href={affiliateConfig.lineOfficialUrl || '#'}
-                    target={affiliateConfig.lineOfficialUrl ? "_blank" : "_self"}
+                    href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
+                    target="_blank"
                     rel="noopener noreferrer"
-                    onClick={(e) => {
-                      if (!affiliateConfig.lineOfficialUrl) {
-                        e.preventDefault();
-                        alert('管理員尚未設定 LINE 官方帳號網址，您可先填寫上方 Email 訂閱！');
-                      }
-                    }}
+                    
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-lg text-xs font-black shadow-xs transition-all cursor-pointer"
                   >
                     <span>💬 加入 LINE 官方帳號通知</span>
@@ -1812,15 +1819,10 @@ export default function App() {
 
                     {/* LINE 官方帳號開賣推播按鈕 */}
                     <a
-                      href={affiliateConfig.lineOfficialUrl || '#'}
-                      target={affiliateConfig.lineOfficialUrl ? "_blank" : "_self"}
+                      href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
+                      target="_blank"
                       rel="noopener noreferrer"
-                      onClick={(e) => {
-                        if (!affiliateConfig.lineOfficialUrl) {
-                          e.preventDefault();
-                          alert('管理員尚未設定 LINE 官方帳號網址，您可先使用 Email 預約開賣通知！');
-                        }
-                      }}
+                      
                       className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0"
                     >
                       <span className="text-base">💬</span>

@@ -10,7 +10,8 @@ export default async function handler(req: any, res: any) {
       officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
       klookDefaultCode: 'DISNEYTW88',
       klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
-      kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組'
+      kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+      lineOfficialUrl: 'https://lin.ee/XnkEyyl'
     },
     activePromo: null,
     exchangeRate: {
@@ -22,4 +23,3 @@ export default async function handler(req: any, res: any) {
     realSubscriberCount: 3
   }));
 }
-

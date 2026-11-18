@@ -51,7 +51,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [klookDefaultCode, setKlookDefaultCode] = useState('');
   const [klookDefaultDesc, setKlookDefaultDesc] = useState('');
   const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('');
-  const [lineOfficialUrl, setLineOfficialUrl] = useState('');
+  const [lineOfficialUrl, setLineOfficialUrl] = useState('https://lin.ee/XnkEyyl');
 
   // 促銷特惠與群發信表單
   const [promoActive, setPromoActive] = useState(false);
@@ -227,7 +227,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           setKlookDefaultCode(data.affiliateConfig.klookDefaultCode || '');
           setKlookDefaultDesc(data.affiliateConfig.klookDefaultDesc || '');
           setKkdayDefaultBonus(data.affiliateConfig.kkdayDefaultBonus || '');
-          setLineOfficialUrl(data.affiliateConfig.lineOfficialUrl || '');
+          setLineOfficialUrl(data.affiliateConfig.lineOfficialUrl && data.affiliateConfig.lineOfficialUrl.trim() ? data.affiliateConfig.lineOfficialUrl.trim() : 'https://lin.ee/XnkEyyl');
         }
 
         if (data.activePromo && data.activePromo.active) {
@@ -261,7 +261,11 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           if (aff.klookDefaultCode) setKlookDefaultCode(aff.klookDefaultCode);
           if (aff.klookDefaultDesc) setKlookDefaultDesc(aff.klookDefaultDesc);
           if (aff.kkdayDefaultBonus) setKkdayDefaultBonus(aff.kkdayDefaultBonus);
-          if (aff.lineOfficialUrl) setLineOfficialUrl(aff.lineOfficialUrl);
+          if (aff.lineOfficialUrl && aff.lineOfficialUrl.trim()) {
+            setLineOfficialUrl(aff.lineOfficialUrl.trim());
+          } else {
+            setLineOfficialUrl('https://lin.ee/XnkEyyl');
+          }
         } catch {}
       }
       const savedEmail = localStorage.getItem('tokyo_disney_email_settings');
