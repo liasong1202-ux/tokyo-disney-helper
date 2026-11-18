@@ -1293,13 +1293,13 @@ export default function App() {
 
             {/* LINE 官方通知推播 */}
             <a
-              href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
+              href={`https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent('您好！我想諮詢海外樂園門票最新促銷折扣碼與人潮情報 🎟️')}`}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer shrink-0"
             >
               <span>💬</span>
-              <span>LINE 通知</span>
+              <span>LINE 諮詢</span>
             </a>
 
             {/* 直達開賣預約 */}
@@ -1819,14 +1819,17 @@ export default function App() {
 
                     {/* LINE 官方帳號開賣推播按鈕 */}
                     <a
-                      href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
+                      href={`https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent(`您好！我想預約 ${currentDayData.dateStr}【${currentPark.name}】開賣通知與早鳥特惠 🏰✨`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      
-                      className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0"
+                      title="點擊自動帶入預約日期發送給官方 LINE"
+                      className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 group"
                     >
-                      <span className="text-base">💬</span>
-                      <span>加 LINE 接收開賣通知</span>
+                      <span className="text-base group-hover:scale-110 transition-transform">💬</span>
+                      <div className="text-left">
+                        <div className="leading-tight">加 LINE 預約這天開賣</div>
+                        <div className="text-[10px] text-emerald-100 font-normal">自動帶入 {currentDayData.dateStr}</div>
+                      </div>
                     </a>
                   </div>
 
