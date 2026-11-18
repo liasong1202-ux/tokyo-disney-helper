@@ -147,18 +147,7 @@ export default function App() {
   });
 
   const currentPark = DISNEY_PARKS[selectedParkId] || DISNEY_PARKS.tokyo;
-  // 動態同步瀏覽器分頁標題，對齊【方案1+方案4】
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const parkNames: Record<DisneyParkId, string> = {
-      tokyo: '東京迪士尼門票情報',
-      hongkong: '香港迪士尼門票情報',
-      shanghai: '上海迪士尼門票情報',
-      usa: '加州迪士尼門票情報',
-    };
-    const parkTitle = parkNames[selectedParkId] || '海外樂園門票情報';
-    document.title = `${parkTitle} - 即時低價日曆・開賣提醒・人潮預報【海外樂園情報站】`;
-  }, [selectedParkId]);
+  
 
 
   // 分園/焦點分區選擇 (各國分園皆可點選切換：東京陸地/海洋；香港全園/魔雪奇緣；上海全園/動物城；美國雙園/奧蘭多)
@@ -233,27 +222,7 @@ export default function App() {
   const [subTargetPark, setSubTargetPark] = useState<'land' | 'sea' | 'both'>('both');
   const [subAlertType, setSubAlertType] = useState<'promo' | 'ticket_open' | 'both'>('both');
   const [openAlertEmail, setOpenAlertEmail] = useState<string>('');
-  const [showLineModal, setShowLineModal] = useState<boolean>(false);
-  const [lineModalTargetDate, setLineModalTargetDate] = useState<string>('');
-  const [copiedLineId, setCopiedLineId] = useState<boolean>(false);
-
-  // 跨平台智慧 LINE 點擊處理 (手機直通喚醒 App，電腦版彈出官方高解析 QR Code 彈窗，徹底杜絕 line.me 官網跳轉)
-  const handleLineClick = (e: React.MouseEvent, dateTarget?: string) => {
-    if (typeof window !== 'undefined') {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      if (isMobile) {
-        // 行動裝置直接跳轉 lin.ee 喚醒 LINE App
-        return;
-      }
-      // 電腦桌面端：阻止直接跳轉以防 LINE 伺服器重定向到首頁，改在網頁上直接彈出專屬加好友 QR Code 彈窗
-      e.preventDefault();
-      setLineModalTargetDate(dateTarget || '');
-      setShowLineModal(true);
-      if (dateTarget && navigator.clipboard) {
-        navigator.clipboard.writeText(`您好！我想預約 ${dateTarget} 開賣通知與早鳥特惠 🏰✨`).catch(() => {});
-      }
-    }
-  };
+  
   const [reservedOpenDateInfo, setReservedOpenDateInfo] = useState<{ date: string; saleOpenDate: string } | null>(null);
   const [submittingSub, setSubmittingSub] = useState<boolean>(false);
   const [welcomeEmailSent, setWelcomeEmailSent] = useState<boolean>(false);
@@ -1270,19 +1239,9 @@ export default function App() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-2xl" role="img" aria-label="castle">🏰</span>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-black text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
-                    {selectedParkId === 'tokyo' ? '東京迪士尼門票情報' :
-                     selectedParkId === 'hongkong' ? '香港迪士尼門票情報' :
-                     selectedParkId === 'shanghai' ? '上海迪士尼門票情報' :
-                     '加州迪士尼門票情報'}
-                  </span>
-                  <span className="hidden sm:inline-block text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-1.5 py-0.5 rounded-md font-bold">
-                    海外樂園門票情報
-                  </span>
-                </div>
-              </div>
+              <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
+                {currentPark.name}門票降價助手
+              </span>
             </div>
 
             {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) - 手機上橫向滾動支援 */}
@@ -1340,11 +1299,10 @@ export default function App() {
               href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => handleLineClick(e)}
               className="px-3 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer shrink-0"
             >
               <span>💬</span>
-              <span>LINE 諮詢</span>
+              <span>LINE 通知</span>
             </a>
 
             {/* 直達開賣預約 */}
@@ -1721,28 +1679,14 @@ export default function App() {
               return (
                 <div
                   key={day.date}
-                  onClick={() => {
-                    setSelectedDateStr(day.date);
-                    if (day.bookingStatus === 'upcoming') {
-                      setTimeout(() => {
-                        const target = document.getElementById('booking-reminder-card');
-                        if (target) {
-                          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          target.classList.add('ring-4', 'ring-rose-400', 'scale-[1.01]');
-                          setTimeout(() => {
-                            target.classList.remove('ring-4', 'ring-rose-400', 'scale-[1.01]');
-                          }, 1200);
-                        }
-                      }, 60);
-                    }
-                  }}
-                  className={`relative cursor-pointer rounded-xl sm:rounded-2xl p-2 sm:p-3 border-2 flex flex-col justify-between transition-all duration-200 min-h-[92px] sm:min-h-[118px] group ${cardBg} ${flashStyle} ${
+                  onClick={() => setSelectedDateStr(day.date)}
+                  className={`relative cursor-pointer rounded-xl sm:rounded-2xl p-2 sm:p-3 border-2 flex flex-col justify-between transition-all duration-150 min-h-[92px] sm:min-h-[118px] group ${cardBg} ${flashStyle} ${
                     isSelected
                       ? 'ring-4 ring-indigo-600 ring-offset-2 shadow-lg z-10 scale-[1.02]'
                       : 'hover:shadow-md'
                   }`}
                 >
-                  {/* 第一視覺元素：日期與星期 */}
+                  {/* 第一行顯示：日期與星期 */}
                   <div className="flex items-start justify-between gap-1">
                     <div className="flex flex-col">
                       <span className="text-xs sm:text-sm font-black tracking-tight leading-tight">
@@ -1750,7 +1694,7 @@ export default function App() {
                       </span>
                       {day.bookingStatus === 'upcoming' ? (
                         <span className="text-[10px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded mt-1 inline-block w-fit leading-none">
-                          ⏳ {day.saleOpenLabel}
+                          ⌛ {day.saleOpenLabel}
                         </span>
                       ) : day.eventNote ? (
                         <span className="text-[10px] text-rose-600 font-bold truncate max-w-[70px] sm:max-w-[90px] leading-none mt-0.5">
@@ -1759,7 +1703,7 @@ export default function App() {
                       ) : null}
                     </div>
 
-                    {/* 第三視覺元素：價格等級標籤 */}
+                    {/* 票價等級標籤 */}
                     <span
                       className={`text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap leading-none ${badgeColor}`}
                     >
@@ -1767,13 +1711,13 @@ export default function App() {
                     </span>
                   </div>
 
-                  {/* 第二視覺元素：台幣預估價格 (含突發促銷對比) */}
+                  {/* 台幣價格 (即時日圓換算) */}
                   <div className="mt-2 text-right">
                     <div className="text-[10px] text-slate-500 font-medium">
                       {day.bookingStatus === 'upcoming' ? (
                         <span className="text-indigo-700 font-bold">預估開賣台幣</span>
                       ) : (
-                        <>預估台幣 {hasPromo && <span className="text-emerald-700 font-bold">(限時特惠)</span>}</>
+                        <>預估台幣 {hasPromo && <span className="text-emerald-700 font-bold">(快閃特惠)</span>}</>
                       )}
                     </div>
                     {hasPromo && (
@@ -1786,23 +1730,17 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 底部微型人潮指示 */}
+                  {/* 底部原幣與人潮指示 */}
                   <div className="mt-1 pt-1 border-t border-black/5 flex items-center justify-between text-[10px] text-slate-500">
                     <span className="tabular-nums font-bold">{day.currencySymbol}{ticketPriceVal.toLocaleString()}</span>
-                    {day.bookingStatus === 'upcoming' ? (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shadow-2xs group-hover:bg-rose-100 group-hover:scale-105 transition-all">
-                        🔔 預約開賣
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 font-medium">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            day.crowdLevel < 40 ? 'bg-emerald-500' : day.crowdLevel <= 70 ? 'bg-amber-500' : 'bg-rose-500'
-                          }`}
-                        ></span>
-                        <span className="hidden sm:inline">{day.crowdStatus}</span>
-                      </span>
-                    )}
+                    <span className="flex items-center gap-1 font-medium">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          day.crowdLevel < 40 ? 'bg-emerald-500' : day.crowdLevel <= 70 ? 'bg-amber-500' : 'bg-rose-500'
+                        }`}
+                      ></span>
+                      <span className="hidden sm:inline">{day.crowdStatus}</span>
+                    </span>
                   </div>
                 </div>
               );
@@ -1867,22 +1805,18 @@ export default function App() {
             {currentDayData.bookingStatus === 'upcoming' && (() => {
               const activeChar = getCharacterById(selectedCharacterId);
               return (
-                <div id="booking-reminder-card" className={`${activeChar.cardBg} border-2 ${activeChar.cardBorder} rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 transition-all duration-300 scroll-mt-20`}>
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="space-y-1.5 flex-1">
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-black shadow-xs">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                        <span>⏰ 尚未到開放訂票時間（入園前 2 個月開賣）</span>
-                      </div>
-                      <h4 className="text-lg sm:text-xl font-black text-slate-900">
-                        想訂 <span className="text-indigo-700">{currentDayData.month}月{currentDayData.day}日</span> 的門票嗎？預計於 <span className="underline font-black text-rose-600">{currentDayData.saleOpenDate} 台灣時間 13:00</span> 開放預訂！
-                      </h4>
-                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                        不用自己設鬧鐘苦等！挑選您喜歡的<strong>迪士尼專屬守護角色</strong>，在下方填入 Email，當 Klook / KKday 與官網<strong>一開放預訂</strong>，該角色將第一秒以<strong>專屬配色圖文祝賀信</strong>與訂票連結通知您！
-                      </p>
+                <div className={`${activeChar.cardBg} border-2 ${activeChar.cardBorder} rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 transition-all duration-300`}>
+                  <div className="space-y-1.5">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-black shadow-xs">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                      <span>⏰ 尚未到開放訂票時間（入園前 2 個月開賣）</span>
                     </div>
-
-                    {/* LINE 按鈕已移至下方整合通知中心 */}
+                    <h4 className="text-lg sm:text-xl font-black text-slate-900">
+                      想訂 <span className="text-indigo-700">{currentDayData.month}月{currentDayData.day}日</span> 的門票嗎？預計於 <span className="underline font-black text-rose-600">{currentDayData.saleOpenDate} 台灣時間 13:00</span> 開放預訂！
+                    </h4>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      不用自己設鬧鐘苦等！挑選您喜歡的<strong>迪士尼專屬守護角色</strong>，在下方選擇【LINE 一鍵預約】或【Email 專屬通知】，開賣第一秒準時推播專屬祝賀與訂票連結給您！
+                    </p>
                   </div>
 
                   {/* 👑 5 大迪士尼開賣通知角色選擇區 (使用參考圖高畫質立繪與角色專屬配色) */}
@@ -1957,14 +1891,15 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 整合式雙通道通知中心 (LINE 與 Email 二擇一，直覺不混淆) */}
-                    <div className="pt-3 border-t-2 border-slate-200/80 space-y-3.5">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
-                          <Bell className="w-4 h-4 text-rose-500 animate-bounce" />
+                    {/* Email 預約送出表單 (按鈕與輸入框光暈隨選用角色配色) */}
+                    {/* 🎯 雙通道開賣預約中心：方式一 (LINE) / 方式二 (Email) */}
+                    <div className="pt-3 space-y-3.5 border-t border-slate-200/80">
+                      <div className="text-xs sm:text-sm font-black text-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Bell className="w-4 h-4 text-rose-500 animate-pulse" />
                           <span>選擇開賣通知方式（{currentDayData.month}月{currentDayData.day}日 開賣第一秒準時推播）：</span>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">任選一種即可完成預約</span>
+                        <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">任選一種即可完成登記</span>
                       </div>
 
                       {/* 方式一：LINE 一鍵預約 (免打字直通) */}
@@ -1976,10 +1911,10 @@ export default function App() {
                           <div>
                             <div className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-1.5">
                               <span>【方式一】用 LINE 一鍵預約開賣</span>
-                              <span className="bg-emerald-700 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">免打字·秒速登記</span>
+                              <span className="bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">免打字·秒速登記</span>
                             </div>
                             <div className="text-[11px] text-emerald-800 font-medium mt-0.5">
-                              點擊自動開啟 LINE 並帶入「{currentDayData.dateStr}」預約訊息，發送即可！
+                              點擊自動前往 LINE 並複製「{currentDayData.dateStr}」預約訊息，送出即可！
                             </div>
                           </div>
                         </div>
@@ -1988,20 +1923,24 @@ export default function App() {
                           href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={(e) => handleLineClick(e, `${currentDayData.dateStr}【${currentPark.name}】`)}
+                          onClick={() => {
+                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                              navigator.clipboard.writeText(`您好！我想預約 ${currentDayData.dateStr}【${currentPark.name}】開賣通知與早鳥特惠 🏰✨`);
+                            }
+                          }}
                           className="w-full sm:w-auto px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
                         >
-                          <span>💬 點此加入 LINE 預約</span>
+                          <span>💬 點此用 LINE 預約</span>
                         </a>
                       </div>
 
                       {/* 分隔線 OR */}
-                      <div className="relative flex py-1 items-center">
-                        <div className="flex-grow border-t border-slate-300"></div>
+                      <div className="relative flex py-0.5 items-center">
+                        <div className="flex-grow border-t border-slate-300/80"></div>
                         <span className="shrink mx-3 text-xs font-black text-slate-500 bg-white px-2.5 py-0.5 rounded-full border border-slate-200 shadow-2xs">
                           或者使用 Email 接收信件
                         </span>
-                        <div className="flex-grow border-t border-slate-300"></div>
+                        <div className="flex-grow border-t border-slate-300/80"></div>
                       </div>
 
                       {/* 方式二：Email 專屬圖文信 */}
@@ -2010,7 +1949,7 @@ export default function App() {
                           <span>【方式二】由【{activeChar.shortName}】發送專屬 Email 開賣通知：</span>
                           <span className="text-[10px] text-slate-500 font-normal">（零垃圾信，開賣當天當刻寄達）</span>
                         </div>
-                        <form onSubmit={handleTicketOpenAlertSubmit} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <form onSubmit={handleTicketOpenAlertSubmit} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                           <input
                             type="email"
                             required
@@ -2026,7 +1965,7 @@ export default function App() {
                             className={`px-6 py-3 bg-gradient-to-r ${activeChar.buttonGradient} ${activeChar.buttonText} font-black text-xs sm:text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer transition-all active:scale-95 disabled:opacity-60`}
                           >
                             <Bell className="w-4 h-4" />
-                            <span>由【{activeChar.shortName}】預約 Email 通知</span>
+                            <span>由【${activeChar.shortName}】預約 Email 通知</span>
                           </button>
                         </form>
                       </div>
