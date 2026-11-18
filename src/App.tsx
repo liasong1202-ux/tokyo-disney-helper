@@ -233,6 +233,27 @@ export default function App() {
   const [subTargetPark, setSubTargetPark] = useState<'land' | 'sea' | 'both'>('both');
   const [subAlertType, setSubAlertType] = useState<'promo' | 'ticket_open' | 'both'>('both');
   const [openAlertEmail, setOpenAlertEmail] = useState<string>('');
+  const [showLineModal, setShowLineModal] = useState<boolean>(false);
+  const [lineModalTargetDate, setLineModalTargetDate] = useState<string>('');
+  const [copiedLineId, setCopiedLineId] = useState<boolean>(false);
+
+  // 跨平台智慧 LINE 點擊處理 (手機直通喚醒 App，電腦版彈出官方高解析 QR Code 彈窗，徹底杜絕 line.me 官網跳轉)
+  const handleLineClick = (e: React.MouseEvent, dateTarget?: string) => {
+    if (typeof window !== 'undefined') {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        // 行動裝置直接跳轉 lin.ee 喚醒 LINE App
+        return;
+      }
+      // 電腦桌面端：阻止直接跳轉以防 LINE 伺服器重定向到首頁，改在網頁上直接彈出專屬加好友 QR Code 彈窗
+      e.preventDefault();
+      setLineModalTargetDate(dateTarget || '');
+      setShowLineModal(true);
+      if (dateTarget && navigator.clipboard) {
+        navigator.clipboard.writeText(`您好！我想預約 ${dateTarget} 開賣通知與早鳥特惠 🏰✨`).catch(() => {});
+      }
+    }
+  };
   const [reservedOpenDateInfo, setReservedOpenDateInfo] = useState<{ date: string; saleOpenDate: string } | null>(null);
   const [submittingSub, setSubmittingSub] = useState<boolean>(false);
   const [welcomeEmailSent, setWelcomeEmailSent] = useState<boolean>(false);
@@ -1319,6 +1340,7 @@ export default function App() {
               href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => handleLineClick(e)}
               className="px-3 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer shrink-0"
             >
               <span>💬</span>
@@ -1966,11 +1988,7 @@ export default function App() {
                           href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={() => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                              navigator.clipboard.writeText(`您好！我想預約 ${currentDayData.dateStr}【${currentPark.name}】開賣通知與早鳥特惠 🏰✨`);
-                            }
-                          }}
+                          onClick={(e) => handleLineClick(e, `${currentDayData.dateStr}【${currentPark.name}】`)}
                           className="w-full sm:w-auto px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
                         >
                           <span>💬 點此加入 LINE 預約</span>
