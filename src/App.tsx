@@ -487,6 +487,19 @@ export default function App() {
   };
 
   // 針對「尚未開放訂票的日期」預約開賣第一秒通知
+  
+  // 一鍵直達 2027 未開賣日期 5 大角色通知中心
+  const handleJumpToFutureSale = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setSelectedYear(2027);
+    setSelectedMonth(2);
+    setSelectedDateStr('2027-02-04');
+    setTimeout(() => {
+      const el = document.getElementById('compare');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+  };
+
   const handleTicketOpenAlertSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentDayData) return;
@@ -1306,13 +1319,14 @@ export default function App() {
             </a>
 
             {/* 直達開賣預約 */}
-            <a
-              href="#subscribe"
+            <button
+              type="button"
+              onClick={handleJumpToFutureSale}
               className="px-3 py-1.5 text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all rounded-xl flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0"
             >
               <Bell className="w-3.5 h-3.5 text-indigo-600" />
-              <span>開賣提醒</span>
-            </a>
+              <span>🔔 開賣提醒 (5大角色)</span>
+            </button>
           </div>
         </div>
       </header>
