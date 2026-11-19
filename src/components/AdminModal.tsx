@@ -9,6 +9,7 @@ import {
   Download,
   CheckCircle2,
   Trash2,
+  Plus,
   RefreshCw,
   ExternalLink,
   Sparkles,
@@ -44,6 +45,18 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [emailHistory, setEmailHistory] = useState<any[]>([]);
   const [exchangeRateCache, setExchangeRateCache] = useState<any>(null);
 
+  const defaultKlookFeatures = [
+    '累積 Klook 旅遊積分，下次行程預訂可直接折抵現金',
+    '支援 LINE Pay / 街口支付，省去 1.5% 海外刷卡手續費',
+    '免現場排隊換票！手機出示電子憑證 QR Code 秒刷入閘',
+  ];
+
+  const defaultKkdayFeatures = [
+    '購票即享日本高速 eSIM 1GB 體驗組',
+    '可合購交通票券與快速通關享專屬同捆折扣',
+    '官方授權憑證秒發，台幣結帳無匯差煩惱',
+  ];
+
   // 聯盟行銷表單
   const [klookUrl, setKlookUrl] = useState('');
   const [kkdayUrl, setKkdayUrl] = useState('');
@@ -52,6 +65,10 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [klookDefaultDesc, setKlookDefaultDesc] = useState('');
   const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('https://lin.ee/XnkEyyl');
+  const [klookFeatures, setKlookFeatures] = useState<string[]>(defaultKlookFeatures);
+  const [newKlookFeature, setNewKlookFeature] = useState<string>('');
+  const [kkdayFeatures, setKkdayFeatures] = useState<string[]>(defaultKkdayFeatures);
+  const [newKkdayFeature, setNewKkdayFeature] = useState<string>('');
 
   // 促銷特惠與群發信表單
   const [promoActive, setPromoActive] = useState(false);
@@ -228,6 +245,12 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           setKlookDefaultDesc(data.affiliateConfig.klookDefaultDesc || '');
           setKkdayDefaultBonus(data.affiliateConfig.kkdayDefaultBonus || '');
           setLineOfficialUrl(data.affiliateConfig.lineOfficialUrl && data.affiliateConfig.lineOfficialUrl.trim() ? data.affiliateConfig.lineOfficialUrl.trim() : 'https://lin.ee/XnkEyyl');
+          if (Array.isArray(data.affiliateConfig.klookFeatures) && data.affiliateConfig.klookFeatures.length > 0) {
+            setKlookFeatures(data.affiliateConfig.klookFeatures);
+          }
+          if (Array.isArray(data.affiliateConfig.kkdayFeatures) && data.affiliateConfig.kkdayFeatures.length > 0) {
+            setKkdayFeatures(data.affiliateConfig.kkdayFeatures);
+          }
         }
 
         if (data.activePromo && data.activePromo.active) {
@@ -258,13 +281,19 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           if (aff.klookUrl) setKlookUrl(aff.klookUrl);
           if (aff.kkdayUrl) setKkdayUrl(aff.kkdayUrl);
           if (aff.officialUrl) setOfficialUrl(aff.officialUrl);
-          if (aff.klookDefaultCode) setKlookDefaultCode(aff.klookDefaultCode);
-          if (aff.klookDefaultDesc) setKlookDefaultDesc(aff.klookDefaultDesc);
-          if (aff.kkdayDefaultBonus) setKkdayDefaultBonus(aff.kkdayDefaultBonus);
+          if (aff.klookDefaultCode !== undefined) setKlookDefaultCode(aff.klookDefaultCode);
+          if (aff.klookDefaultDesc !== undefined) setKlookDefaultDesc(aff.klookDefaultDesc);
+          if (aff.kkdayDefaultBonus !== undefined) setKkdayDefaultBonus(aff.kkdayDefaultBonus);
           if (aff.lineOfficialUrl && aff.lineOfficialUrl.trim()) {
             setLineOfficialUrl(aff.lineOfficialUrl.trim());
           } else {
             setLineOfficialUrl('https://lin.ee/XnkEyyl');
+          }
+          if (Array.isArray(aff.klookFeatures)) {
+            setKlookFeatures(aff.klookFeatures);
+          }
+          if (Array.isArray(aff.kkdayFeatures)) {
+            setKkdayFeatures(aff.kkdayFeatures);
           }
         } catch {}
       }
@@ -406,6 +435,8 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
       klookDefaultDesc,
       kkdayDefaultBonus,
       lineOfficialUrl,
+      klookFeatures,
+      kkdayFeatures,
     };
     // 1. 本地永久持久化
     localStorage.setItem('tokyo_disney_affiliate_config', JSON.stringify(configData));
@@ -727,7 +758,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                     🖱️ 訪客最近點擊購票紀錄（共 {totalClicks} 次點擊）
                   </h3>
                   <button
-                    onClick={fetchDashboard}
+                    onClick={() => fetchDashboard()}
                     className="text-xs text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> 重新整理
@@ -816,12 +847,13 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      🟠 Klook 常駐顯示優惠碼
+                      🟠 Klook 常駐顯示優惠碼 <span className="text-[10px] text-slate-400 font-normal">(無常態折扣碼請留空)</span>
                     </label>
                     <input
                       type="text"
                       value={klookDefaultCode}
                       onChange={(e) => setKlookDefaultCode(e.target.value)}
+                      placeholder="留空則不顯示優惠碼標籤"
                       className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono font-bold text-orange-600"
                     />
                   </div>
@@ -833,8 +865,91 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                       type="text"
                       value={klookDefaultDesc}
                       onChange={(e) => setKlookDefaultDesc(e.target.value)}
+                      placeholder="例如：結帳輸入優惠碼現省 NT$100 (無則留空)"
                       className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
                     />
+                  </div>
+                </div>
+
+                {/* 綠勾勾賣點清單管理 - Klook */}
+                <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-orange-950">
+                        🟠 Klook 卡片「綠勾勾特色賣點」管理 (可自由新增 / 刪除)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setKlookFeatures([...defaultKlookFeatures])}
+                      className="text-[11px] text-orange-700 hover:text-orange-900 underline cursor-pointer"
+                    >
+                      恢復推薦賣點
+                    </button>
+                  </div>
+                  
+                  <p className="text-[11px] text-slate-500">
+                    前台 Klook 比價卡片所列出的綠勾勾項目。您可以直接在文字框修改、點右側紅色垃圾桶刪除，或在下方新增最新賣點。
+                  </p>
+
+                  <div className="space-y-2">
+                    {klookFeatures.map((feat, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <input
+                          type="text"
+                          value={feat}
+                          onChange={(e) => {
+                            const next = [...klookFeatures];
+                            next[idx] = e.target.value;
+                            setKlookFeatures(next);
+                          }}
+                          className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          placeholder="賣點說明..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setKlookFeatures(klookFeatures.filter((_, i) => i !== idx))}
+                          className="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="刪除此項目"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={newKlookFeature}
+                      onChange={(e) => setNewKlookFeature(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newKlookFeature.trim()) {
+                            setKlookFeatures([...klookFeatures, newKlookFeature.trim()]);
+                            setNewKlookFeature('');
+                          }
+                        }
+                      }}
+                      placeholder="輸入新賣點 (例如: 支援 LINE Pay / 街口支付，省去 1.5% 海外手續費)..."
+                      className="flex-1 px-3 py-1.5 text-xs bg-white border border-dashed border-orange-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newKlookFeature.trim()) {
+                          setKlookFeatures([...klookFeatures, newKlookFeature.trim()]);
+                          setNewKlookFeature('');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-lg shrink-0 cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>新增一項</span>
+                    </button>
                   </div>
                 </div>
 
@@ -864,6 +979,88 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                     onChange={(e) => setKkdayDefaultBonus(e.target.value)}
                     className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
                   />
+                </div>
+
+                {/* 綠勾勾賣點清單管理 - KKday */}
+                <div className="bg-sky-50/70 border border-sky-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-sky-950">
+                        🔵 KKday 卡片「綠勾勾特色賣點」管理 (可自由新增 / 刪除)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setKkdayFeatures([...defaultKkdayFeatures])}
+                      className="text-[11px] text-sky-700 hover:text-sky-900 underline cursor-pointer"
+                    >
+                      恢復推薦賣點
+                    </button>
+                  </div>
+                  
+                  <p className="text-[11px] text-slate-500">
+                    前台 KKday 比價卡片所列出的綠勾勾項目。您可以直接在文字框修改、點右側紅色垃圾桶刪除，或在下方新增最新賣點。
+                  </p>
+
+                  <div className="space-y-2">
+                    {kkdayFeatures.map((feat, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <input
+                          type="text"
+                          value={feat}
+                          onChange={(e) => {
+                            const next = [...kkdayFeatures];
+                            next[idx] = e.target.value;
+                            setKkdayFeatures(next);
+                          }}
+                          className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          placeholder="賣點說明..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setKkdayFeatures(kkdayFeatures.filter((_, i) => i !== idx))}
+                          className="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="刪除此項目"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={newKkdayFeature}
+                      onChange={(e) => setNewKkdayFeature(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newKkdayFeature.trim()) {
+                            setKkdayFeatures([...kkdayFeatures, newKkdayFeature.trim()]);
+                            setNewKkdayFeature('');
+                          }
+                        }
+                      }}
+                      placeholder="輸入新賣點 (例如: 贈送日本 eSIM 1GB 體驗組)..."
+                      className="flex-1 px-3 py-1.5 text-xs bg-white border border-dashed border-sky-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newKkdayFeature.trim()) {
+                          setKkdayFeatures([...kkdayFeatures, newKkdayFeature.trim()]);
+                          setNewKkdayFeature('');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg shrink-0 cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>新增一項</span>
+                    </button>
+                  </div>
                 </div>
 
                 <hr className="border-slate-200" />

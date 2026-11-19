@@ -142,6 +142,8 @@ export interface AffiliateConfig {
   klookDefaultDesc: string;
   kkdayDefaultBonus: string;
   lineOfficialUrl?: string; // LINE 官方帳號加好友連結 e.g. https://line.me/R/ti/p/@your_line_id
+  klookFeatures?: string[];
+  kkdayFeatures?: string[];
 }
 
 export interface EmailSettings {
@@ -193,12 +195,23 @@ const DEFAULT_STORE: StoreData = {
     Official: 0,
   },
   affiliateConfig: {
-    klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=YOUR_KLOOK_AID&utm_campaign=ticket_calendar',
-    kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=YOUR_KKDAY_CID&ud1=price_calendar',
+    klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/',
+    kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan',
     officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
-    klookDefaultCode: 'DISNEYTW88',
-    klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
+    klookDefaultCode: '',
+    klookDefaultDesc: '',
     kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+    lineOfficialUrl: 'https://lin.ee/XnkEyyl',
+    klookFeatures: [
+      '累積 Klook 旅遊積分，下次行程預訂可直接折抵現金',
+      '支援 LINE Pay / 街口支付，省去 1.5% 海外刷卡手續費',
+      '免現場排隊換票！手機出示電子憑證 QR Code 秒刷入閘',
+    ],
+    kkdayFeatures: [
+      '購票即享日本高速 eSIM 1GB 體驗組',
+      '可合購交通票券與快速通關享專屬同捆折扣',
+      '官方授權憑證秒發，台幣結帳無匯差煩惱',
+    ],
   },
   activePromo: null,
   emailSettings: {
@@ -928,6 +941,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         klookDefaultDesc: String(body.klookDefaultDesc ?? store.affiliateConfig.klookDefaultDesc).trim(),
         kkdayDefaultBonus: String(body.kkdayDefaultBonus ?? store.affiliateConfig.kkdayDefaultBonus).trim(),
         lineOfficialUrl: String(body.lineOfficialUrl ?? store.affiliateConfig.lineOfficialUrl ?? '').trim(),
+        klookFeatures: Array.isArray(body.klookFeatures) ? body.klookFeatures.map(String) : store.affiliateConfig.klookFeatures,
+        kkdayFeatures: Array.isArray(body.kkdayFeatures) ? body.kkdayFeatures.map(String) : store.affiliateConfig.kkdayFeatures,
       };
       saveStore(store);
       sendJson(res, 200, { ok: true, affiliateConfig: store.affiliateConfig });

@@ -74,7 +74,7 @@ export const DISNEY_PARKS: Record<DisneyParkId, ParkConfig> = {
     features: [
       '365天全年無休，淡季平日享全年月最低票價',
       '全新第 8 大主題園區「夢幻泉鄉」需領取 Standby Pass 或 DPA 入園',
-      '台幣線上刷卡免收 1.5% 海外信用卡手續費，秒發電子 QR Code',
+      '支援台幣扣款與 LINE Pay / 街口支付，秒發電子 QR Code',
     ],
     tiers: [
       { tier: 'cheap', label: '💰 最便宜', badge: 'Tier 1 / 2 省錢日', localPrice: 8900, description: '淡季平日（週二至週四），票價全月最低' },
@@ -107,8 +107,8 @@ export const DISNEY_PARKS: Record<DisneyParkId, ParkConfig> = {
     klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/',
     kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-ticket',
     officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
-    klookPromoCode: 'DISNEYTW88',
-    klookPromoDesc: '結帳輸入折扣碼現折 NT$ 100',
+    klookPromoCode: '',
+    klookPromoDesc: '',
     kkdayBonus: '送日本 3GB 上網 eSIM 體驗序號',
     accentColor: '#4f46e5',
     gradient: 'from-indigo-900 via-indigo-800 to-blue-900',

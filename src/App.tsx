@@ -66,7 +66,7 @@ const FAQ_LIST = [
   },
   {
     q: '東京迪士尼門票推薦在哪裡買最划算？',
-    a: '強烈推薦透過官方授權平台 Klook 或 KKday 購買。除了票價完全透明並可直接用台幣結帳、免收 1.5% 海外信用卡交易手續費外，還能疊加使用專屬折扣碼（如 Klook【DISNEYTW88】滿額現折，或 KKday 贈送日本上網 eSIM 專案），訂單完成後秒出電子憑證 QR Code，入園手機直接掃碼即可入場！',
+    a: '強烈推薦透過官方授權平台 Klook 或 KKday 購買。票價完全透明並以新台幣計價，支援 LINE Pay、街口與各大信用卡，還能累積平台旅遊積分折抵現金，訂單完成後秒出電子憑證 QR Code，入園手機直接掃碼即可入場！',
     tip: '若在迪士尼官網購買，需走日本伺服器刷日幣並多負擔海外交易手續費，且介面在熱門時段容易壅塞當機。',
   },
   {
@@ -100,11 +100,25 @@ interface AffiliateConfig {
   klookUrl: string;
   kkdayUrl: string;
   officialUrl: string;
-  klookDefaultCode: string;
-  klookDefaultDesc: string;
-  kkdayDefaultBonus: string;
+  klookDefaultCode?: string;
+  klookDefaultDesc?: string;
+  kkdayDefaultBonus?: string;
   lineOfficialUrl?: string;
+  klookFeatures?: string[];
+  kkdayFeatures?: string[];
 }
+
+const defaultKlookFeatures = [
+  '累積 Klook 旅遊積分，下次行程預訂可直接折抵現金',
+  '支援 LINE Pay / 街口支付，省去 1.5% 海外刷卡手續費',
+  '免現場排隊換票！手機出示電子憑證 QR Code 秒刷入閘',
+];
+
+const defaultKkdayFeatures = [
+  '購票即享日本高速 eSIM 1GB 體驗組',
+  '可合購交通票券與快速通關享專屬同捆折扣',
+  '官方授權憑證秒發，台幣結帳無匯差煩惱',
+];
 
 export default function App() {
   // 當前選取的月份 (支援 URL 參數如 ?year=2027&month=2 或 ?date=2027-02-14 預載)
@@ -181,13 +195,28 @@ export default function App() {
   const activeRate = selectedParkId === 'tokyo' ? exchangeRate : currentPark.defaultRate;
 
   // 後端聯盟行銷連結與常駐優惠設定
-  const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>({
-    klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=YOUR_KLOOK_AID&utm_campaign=ticket_calendar',
-    kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=YOUR_KKDAY_CID&ud1=price_calendar',
-    officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
-    klookDefaultCode: 'DISNEYTW88',
-    klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
-    kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+  const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>(() => {
+    const base: AffiliateConfig = {
+      klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/',
+      kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan',
+      officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
+      klookDefaultCode: '',
+      klookDefaultDesc: '',
+      kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+      lineOfficialUrl: 'https://lin.ee/XnkEyyl',
+      klookFeatures: defaultKlookFeatures,
+      kkdayFeatures: defaultKkdayFeatures,
+    };
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('tokyo_disney_affiliate_config');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return { ...base, ...parsed };
+        }
+      } catch {}
+    }
+    return base;
   });
 
   // 篩選標籤
@@ -282,7 +311,16 @@ export default function App() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.affiliateConfig) {
-        setAffiliateConfig(data.affiliateConfig);
+        setAffiliateConfig(prev => {
+          try {
+            const saved = localStorage.getItem('tokyo_disney_affiliate_config');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              return { ...prev, ...data.affiliateConfig, ...parsed };
+            }
+          } catch {}
+          return { ...prev, ...data.affiliateConfig };
+        });
       }
       if (data.exchangeRate && typeof data.exchangeRate.rate === 'number') {
         setExchangeRate(data.exchangeRate.rate);
@@ -765,7 +803,7 @@ export default function App() {
             <div>
               <div class="flex items-center justify-between">
                 <span class="text-lg font-black text-orange-600">Klook 客路 (推薦)</span>
-                <span id="klook-promo-badge" class="text-[11px] bg-orange-500 text-white font-bold px-2 py-0.5 rounded">現折百元碼</span>
+                <span class="text-[11px] bg-orange-500 text-white font-bold px-2 py-0.5 rounded">官方授權</span>
               </div>
               <div class="mt-4">
                 <div class="text-xs text-slate-500 font-medium">特惠折抵價 (台幣)</div>
@@ -773,18 +811,18 @@ export default function App() {
                   NT$ <span id="klook-price">1,814</span>
                 </div>
                 <p class="text-xs text-slate-400 mt-1 line-through">
-                  官網換算約 NT$ <span id="klook-original-price">1,914</span>
+                  官網定價 NT$ <span id="klook-original-price">1,914</span>
                 </p>
               </div>
               <ul class="text-xs text-slate-600 space-y-1.5 mt-4">
-                <li>✅ 結帳輸入優惠碼【<strong id="klook-code-text" class="text-orange-600">DISNEYTW88</strong>】現享加碼折抵</li>
-                <li>✅ 以台幣直接結帳，免收 1.5% 海外刷卡手續費</li>
+                <li>✅ 累積 Klook 旅遊積分，下次行程預訂可直接折抵現金</li>
+                <li>✅ 支援 LINE Pay / 街口支付，省去 1.5% 海外刷卡手續費</li>
                 <li>✅ 憑證即時出票，手機 QR Code 直接掃碼入園</li>
               </ul>
             </div>
             <a href="https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=affiliate_disney_tw" target="_blank" rel="noopener noreferrer" class="mt-5 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all">
               <span>🛒</span>
-              <span>前往 Klook 搶購 (領百元折價)</span>
+              <span>前往 Klook 購票 (享專屬特惠)</span>
             </a>
           </div>
 
@@ -1965,28 +2003,15 @@ export default function App() {
                     </div>
 
                     <div className="mt-4 space-y-2 text-xs text-slate-600 border-t border-orange-100 pt-3">
-                      <div className="flex items-start gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>
-                          {promoState && promoState.platform === 'Klook' ? (
-                            <span className="text-emerald-700 font-bold">
-                              已套用快閃碼【<code className="text-orange-600">{promoState.code}</code>】現享 {Math.round(promoState.discountRate * 100)} 折！
-                            </span>
-                          ) : (
-                            <span>
-                              {currentPark.klookPromoDesc}【<strong className="text-orange-600">{currentPark.klookPromoCode}</strong>】
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>以新台幣直接扣款，<strong>免外幣交易手續費 1.5%</strong></span>
-                      </div>
-                      <div className="flex items-start gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>免現場排隊換票！手機出示電子憑證 QR Code 秒刷入閘</span>
-                      </div>
+                      {(affiliateConfig.klookFeatures && affiliateConfig.klookFeatures.length > 0
+                        ? affiliateConfig.klookFeatures
+                        : defaultKlookFeatures
+                      ).map((feat, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -2022,18 +2047,15 @@ export default function App() {
                     </div>
 
                     <div className="mt-4 space-y-2 text-xs text-slate-600 border-t border-sky-100 pt-3">
-                      <div className="flex items-start gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>{currentPark.kkdayBonus}</strong></span>
-                      </div>
-                      <div className="flex items-start gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>可合購交通票券與快速通關享專屬同捆折扣</span>
-                      </div>
-                      <div className="flex items-start gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>官方授權憑證秒發，台幣結帳無匯差煩惱</span>
-                      </div>
+                      {(affiliateConfig.kkdayFeatures && affiliateConfig.kkdayFeatures.length > 0
+                        ? affiliateConfig.kkdayFeatures
+                        : defaultKkdayFeatures
+                      ).map((feat, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -2616,7 +2638,7 @@ export default function App() {
                   className={`w-full py-3 px-4 bg-gradient-to-r ${char.buttonGradient} ${char.buttonText} font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all hover:opacity-95`}
                 >
                   <ShoppingCart className="w-4 h-4" />
-                  <span>先去 Klook 領取常駐優惠碼【{affiliateConfig.klookDefaultCode}】</span>
+                  <span>前往 Klook 查看即時票價與特惠</span>
                 </button>
                 <button
                   onClick={() => setShowSubscribeModal(false)}
