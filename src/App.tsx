@@ -2723,55 +2723,43 @@ export default function App() {
               </div>
 
               <div className="p-5 sm:p-6 space-y-4">
-                {/* 🚀 免打字、免貼上！自動帶入訊息提示 */}
-                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-3.5 text-xs text-emerald-950 font-bold space-y-1 shadow-2xs">
+                {/* 📱 手機掃描導引提示 */}
+                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-3.5 text-xs text-emerald-950 font-bold space-y-1.5 shadow-2xs">
                   <div className="flex items-center justify-center gap-1.5 text-sm font-black text-emerald-800">
-                    <span>🚀 訊息已為您自動打好！</span>
+                    <span>📱 請拿起手機相機掃描下方 QR Code</span>
                   </div>
                   <p className="text-slate-600 font-medium">
-                    打開 LINE 聊天室<strong>文字已自動帶入輸入框</strong>，您只需直接按<strong>「送出 ✈️」</strong>即可完成登記！
+                    手機一掃自動打開 LINE 聊天室，<strong>預約訊息已為您自動打好</strong>，直接按<strong>「送出 ✈️」</strong>即可完成登記！
                   </p>
                   {lineModalTargetDate && (
                     <div className="pt-1 text-[11px] text-emerald-700 font-extrabold truncate">
-                      已預載：{lineModalTargetDate} 開賣通知
+                      ✨ 已為您鎖定：{lineModalTargetDate} 開賣通知
                     </div>
                   )}
                 </div>
 
                 {/* 動態高解析度 QR Code (手機相機一掃，自動開啟 LINE 並帶入文字) */}
-                <div className="flex flex-col items-center justify-center py-1">
-                  <div className="p-3 bg-white border-2 border-[#06C755]/30 rounded-2xl shadow-sm inline-block">
+                <div className="flex flex-col items-center justify-center py-2">
+                  <div className="p-3.5 bg-white border-2 border-[#06C755] rounded-3xl shadow-md inline-block">
                     <img
                       src={dynamicQrCodeUrl}
                       onError={(e) => {
                         e.currentTarget.src = 'https://qr-official.line.me/gs/M_272tfkev_GW.png';
                       }}
                       alt="LINE 官方帳號 QR Code"
-                      className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                      className="w-52 h-52 sm:w-56 sm:h-56 object-contain"
                     />
                   </div>
-                  <p className="text-xs font-bold text-slate-700 mt-2.5 flex items-center gap-1.5">
-                    <span>📱 拿起手機相機一掃，自動打開 LINE 並帶好訊息！</span>
+                  <p className="text-xs font-black text-slate-700 mt-3 flex items-center gap-1.5">
+                    <span>📷 打開手機相機直接對準即可掃描</span>
                   </p>
                 </div>
 
-                {/* 電腦已安裝 LINE 快捷啟動 */}
-                <div className="space-y-2">
-                  <a
-                    href={targetLineUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 px-4 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
-                  >
-                    <span>💬 電腦直接開啟 LINE（已自動帶入訊息）</span>
-                  </a>
-                </div>
-
                 {/* 一鍵複製 Basic ID 備援 */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-3 text-xs">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
                   <div className="text-left">
-                    <span className="text-slate-500 font-medium">官方 Basic ID：</span>
-                    <strong className="text-slate-900 font-black ml-1">@272tfkev</strong>
+                    <span className="text-slate-500 font-medium">或在 LINE 搜尋 ID：</span>
+                    <strong className="text-slate-900 font-black ml-1 text-sm">@272tfkev</strong>
                   </div>
                   <button
                     type="button"
@@ -2782,21 +2770,21 @@ export default function App() {
                         setTimeout(() => setCopiedLineId(false), 2000);
                       }
                     }}
-                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                       copiedLineId
                         ? 'bg-emerald-600 text-white'
                         : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                     }`}
                   >
-                    {copiedLineId ? <span>✓ 已複製</span> : <span>複製 ID</span>}
+                    {copiedLineId ? <span>✓ 已複製 ID</span> : <span>複製 ID</span>}
                   </button>
                 </div>
 
-                <div>
+                <div className="pt-1">
                   <button
                     type="button"
                     onClick={() => setShowLineModal(false)}
-                    className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 font-bold rounded-lg transition-all cursor-pointer"
+                    className="w-full py-2.5 text-xs text-slate-400 hover:text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
                   >
                     關閉視窗
                   </button>
