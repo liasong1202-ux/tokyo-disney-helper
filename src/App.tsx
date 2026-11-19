@@ -147,8 +147,6 @@ export default function App() {
   });
 
   const currentPark = DISNEY_PARKS[selectedParkId] || DISNEY_PARKS.tokyo;
-  
-
 
   // 分園/焦點分區選擇 (各國分園皆可點選切換：東京陸地/海洋；香港全園/魔雪奇緣；上海全園/動物城；美國雙園/奧蘭多)
   const [selectedSubParkIndex, setSelectedSubParkIndex] = useState<number>(() => {
@@ -182,31 +180,14 @@ export default function App() {
 
   const activeRate = selectedParkId === 'tokyo' ? exchangeRate : currentPark.defaultRate;
 
-  // 後端聯盟行銷連結與常駐優惠設定 (優先讀取站長自訂之持久化網址，永不重置)
-  const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>(() => {
-    const defaults: AffiliateConfig = {
-      klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=YOUR_KLOOK_AID&utm_campaign=ticket_calendar',
-      kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=YOUR_KKDAY_CID&ud1=price_calendar',
-      officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
-      klookDefaultCode: 'DISNEYTW88',
-      klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
-      kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
-      lineOfficialUrl: 'https://lin.ee/XnkEyyl',
-    };
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tokyo_disney_affiliate_config');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return {
-            ...defaults,
-            ...parsed,
-            lineOfficialUrl: parsed.lineOfficialUrl && parsed.lineOfficialUrl.trim() ? parsed.lineOfficialUrl.trim() : defaults.lineOfficialUrl,
-          };
-        } catch {}
-      }
-    }
-    return defaults;
+  // 後端聯盟行銷連結與常駐優惠設定
+  const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>({
+    klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=YOUR_KLOOK_AID&utm_campaign=ticket_calendar',
+    kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=YOUR_KKDAY_CID&ud1=price_calendar',
+    officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
+    klookDefaultCode: 'DISNEYTW88',
+    klookDefaultDesc: '結帳輸入優惠碼現省 NT$100',
+    kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
   });
 
   // 篩選標籤
@@ -222,13 +203,45 @@ export default function App() {
   const [subTargetPark, setSubTargetPark] = useState<'land' | 'sea' | 'both'>('both');
   const [subAlertType, setSubAlertType] = useState<'promo' | 'ticket_open' | 'both'>('both');
   const [openAlertEmail, setOpenAlertEmail] = useState<string>('');
-  
   const [reservedOpenDateInfo, setReservedOpenDateInfo] = useState<{ date: string; saleOpenDate: string } | null>(null);
   const [submittingSub, setSubmittingSub] = useState<boolean>(false);
   const [welcomeEmailSent, setWelcomeEmailSent] = useState<boolean>(false);
   const [subscriberCount, setSubscriberCount] = useState<number>(12481);
   const [showSubscribeModal, setShowSubscribeModal] = useState<boolean>(false);
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
+  const [showLineModal, setShowLineModal] = useState<boolean>(false);
+  const [lineModalTargetDate, setLineModalTargetDate] = useState<string>('');
+  const [copiedLineId, setCopiedLineId] = useState<boolean>(false);
+  const [copiedLineMsg, setCopiedLineMsg] = useState<boolean>(false);
+
+  // 跨平台智慧 LINE 加好友彈窗與自動複製預約訊息
+  const handleOpenLineModal = (dateTarget?: string) => {
+    const defaultMsg = dateTarget 
+      ? `您好！我想預約 ${dateTarget} 開賣通知與早鳥特惠 🏰✨`
+      : '您好！我想接收【海外樂園門票情報】開賣通知與早鳥特惠 🏰✨';
+    
+    // 自動複製預約訊息至剪貼簿
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(defaultMsg);
+        setCopiedLineMsg(true);
+        setTimeout(() => setCopiedLineMsg(false), 3000);
+      }
+    } catch {
+      // ignore
+    }
+
+    // 判斷是否為行動裝置
+    const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = 'https://lin.ee/XnkEyyl';
+      return;
+    }
+
+    // 電腦桌面端：彈出超高質感官方加好友 QR Code 彈窗
+    setLineModalTargetDate(dateTarget || '');
+    setShowLineModal(true);
+  };
 
   // 5 位迪士尼開賣通知守護大使 (支援 URL 參數如 ?char=pooh 或 ?char=donald 預載)
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>(() => {
@@ -250,19 +263,8 @@ export default function App() {
     return false;
   });
 
-  // 促銷狀態 (優先讀取站長設定的持久化促銷，永遠記住最新狀態)
-  const [promoState, setPromoState] = useState<PromoState | null>(() => {
-    if (typeof window !== 'undefined') {
-      const savedPromo = localStorage.getItem('tokyo_disney_promo_state');
-      if (savedPromo) {
-        try {
-          const parsed = JSON.parse(savedPromo);
-          if (parsed && parsed.active) return parsed;
-        } catch {}
-      }
-    }
-    return null;
-  });
+  // 模擬突發促銷狀態
+  const [promoState, setPromoState] = useState<PromoState | null>(null);
   const [showPushToast, setShowPushToast] = useState<boolean>(false);
   const [isPriceFlashing, setIsPriceFlashing] = useState<boolean>(false);
 
@@ -277,20 +279,7 @@ export default function App() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.affiliateConfig) {
-        let localAff = {};
-        if (typeof window !== 'undefined') {
-          const raw = localStorage.getItem('tokyo_disney_affiliate_config');
-          if (raw) {
-            try { localAff = JSON.parse(raw); } catch {}
-          }
-        }
-        setAffiliateConfig(prev => {
-          const merged = { ...prev, ...data.affiliateConfig, ...localAff };
-          if (!merged.lineOfficialUrl || !merged.lineOfficialUrl.trim()) {
-            merged.lineOfficialUrl = 'https://lin.ee/XnkEyyl';
-          }
-          return merged;
-        });
+        setAffiliateConfig(data.affiliateConfig);
       }
       if (data.exchangeRate && typeof data.exchangeRate.rate === 'number') {
         setExchangeRate(data.exchangeRate.rate);
@@ -299,23 +288,7 @@ export default function App() {
       if (typeof data.subscriberCount === 'number') {
         setSubscriberCount(data.subscriberCount);
       }
-      if (typeof window !== 'undefined') {
-        const localPromoRaw = localStorage.getItem('tokyo_disney_promo_state');
-        if (localPromoRaw) {
-          try {
-            const lp = JSON.parse(localPromoRaw);
-            if (lp) {
-              setPromoState(lp.active ? lp : null);
-              if (lp.active) setShowPushToast(true);
-            }
-          } catch {}
-        } else if (data.activePromo && data.activePromo.active) {
-          setPromoState(data.activePromo);
-          setShowPushToast(true);
-        } else {
-          setPromoState(null);
-        }
-      } else if (data.activePromo && data.activePromo.active) {
+      if (data.activePromo && data.activePromo.active) {
         setPromoState(data.activePromo);
         setShowPushToast(true);
       } else {
@@ -487,19 +460,6 @@ export default function App() {
   };
 
   // 針對「尚未開放訂票的日期」預約開賣第一秒通知
-  
-  // 一鍵直達 2027 未開賣日期 5 大角色通知中心
-  const handleJumpToFutureSale = (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    setSelectedYear(2027);
-    setSelectedMonth(2);
-    setSelectedDateStr('2027-02-04');
-    setTimeout(() => {
-      const el = document.getElementById('compare');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 120);
-  };
-
   const handleTicketOpenAlertSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentDayData) return;
@@ -1212,7 +1172,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16 w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
       {/* 模擬即時推播橫幅 Toast (當突發促銷觸發時跳出) */}
       {showPushToast && promoState && promoState.active && (
         <div className="fixed bottom-6 right-6 z-50 max-w-md bg-slate-900 text-white rounded-2xl p-4 shadow-2xl border-2 border-emerald-400 flex items-start gap-3.5 animate-in slide-in-from-bottom duration-300">
@@ -1246,19 +1206,19 @@ export default function App() {
       )}
 
       {/* 頂部導航列 */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 w-full max-w-full overflow-hidden">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:h-16 flex flex-wrap items-center justify-between gap-3">
           {/* Zone 1: 品牌標題與全球樂園快速切換器 */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2">
               <span className="text-2xl" role="img" aria-label="castle">🏰</span>
               <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
-                {currentPark.name}門票降價助手
+                海外樂園門票情報
               </span>
             </div>
 
-            {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) - 手機上橫向滾動支援 */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs overflow-x-auto max-w-full scrollbar-none py-1">
+            {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs">
               {PARKS_LIST.map((park) => {
                 const isActive = park.id === selectedParkId;
                 return (
@@ -1266,7 +1226,7 @@ export default function App() {
                     key={park.id}
                     type="button"
                     onClick={() => handleParkSwitch(park.id)}
-                    className={`px-2.5 py-1 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                    className={`px-2.5 py-1 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-xs scale-102'
                         : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
@@ -1290,48 +1250,28 @@ export default function App() {
             </div>
           </div>
 
-          {/* Zone 2: 導航 */}
-          <nav className="hidden xl:flex items-center gap-5 text-sm font-medium text-slate-600">
-            <a href="#subscribe" className="hover:text-indigo-600 transition-colors whitespace-nowrap">降價通知</a>
-            <a href="#calendar" className="hover:text-indigo-600 transition-colors whitespace-nowrap">低價日曆</a>
-            <a href="#compare" className="hover:text-indigo-600 transition-colors whitespace-nowrap">三平台比價</a>
-            <a href="#rides" className="hover:text-indigo-600 transition-colors whitespace-nowrap">熱門設施</a>
-            <a href="#crowd" className="hover:text-indigo-600 transition-colors whitespace-nowrap">人潮預報</a>
-          </nav>
-
-          {/* Zone 3: 正式商用頂部快捷導航（即時匯率 + 開賣通知 + LINE 推播） */}
-          <div className="flex items-center gap-2 overflow-x-auto max-w-full scrollbar-none py-0.5 md:py-0 w-full md:w-auto justify-start md:justify-end">
+          {/* Zone 2: 正式商用頂部快捷導航（即時匯率 + LINE 推播） */}
+          <div className="flex items-center gap-2.5 shrink-0 ml-auto sm:ml-0">
             {/* 動態多幣別即時匯率牌告膠囊 */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs shrink-0 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>{currentPark.flag} {currentPark.ratePrefix} ≈ NT$ {activeRate.toFixed(selectedParkId === 'tokyo' ? 4 : 2)}</span>
             </div>
 
-            {/* LINE 官方通知推播 */}
-            <a
-              href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer shrink-0"
+            {/* LINE 官方通知推播按鈕 */}
+            <button
+              type="button"
+              onClick={() => handleOpenLineModal()}
+              className="px-3.5 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer active:scale-95"
             >
               <span>💬</span>
               <span>LINE 通知</span>
-            </a>
-
-            {/* 直達開賣預約 */}
-            <button
-              type="button"
-              onClick={handleJumpToFutureSale}
-              className="px-3 py-1.5 text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all rounded-xl flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0"
-            >
-              <Bell className="w-3.5 h-3.5 text-indigo-600" />
-              <span>🔔 開賣提醒 (5大角色)</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 space-y-6 w-full max-w-full overflow-hidden">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
 
         {/* 🔔 核心功能 1：【平台促銷降價・立馬通知我】訂閱核心卡片 */}
         <section id="subscribe" className={`bg-gradient-to-r ${currentPark.gradient} text-white rounded-3xl p-6 sm:p-7 shadow-xl border-2 border-indigo-500/40 relative overflow-hidden transition-all duration-300`}>
@@ -1432,10 +1372,15 @@ export default function App() {
                 <div className="pt-2 border-t border-white/15 flex items-center justify-between gap-2">
                   <span className="text-[11px] text-indigo-100 font-bold">📲 習慣用 LINE？</span>
                   <a
-                    href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
-                    target="_blank"
+                    href={affiliateConfig.lineOfficialUrl || '#'}
+                    target={affiliateConfig.lineOfficialUrl ? "_blank" : "_self"}
                     rel="noopener noreferrer"
-                    
+                    onClick={(e) => {
+                      if (!affiliateConfig.lineOfficialUrl) {
+                        e.preventDefault();
+                        alert('管理員尚未設定 LINE 官方帳號網址，您可先填寫上方 Email 訂閱！');
+                      }
+                    }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-lg text-xs font-black shadow-xs transition-all cursor-pointer"
                   >
                     <span>💬 加入 LINE 官方帳號通知</span>
@@ -1636,27 +1581,19 @@ export default function App() {
             </div>
           </div>
 
-          {/* 日曆網格容器：手機版提供流暢左右橫向滾動，桌機版滿版自適應 */}
-          <div className="space-y-1">
-            <div className="flex sm:hidden items-center justify-between text-[11px] text-slate-500 font-medium px-1 mb-1">
-              <span>👉 左右滑動日曆可查看一週 7 天完整票價</span>
-              <span className="text-indigo-600 font-bold">左右滑動 ↔</span>
-            </div>
-            <div className="overflow-x-auto pb-3 -mx-2 px-2 sm:mx-0 sm:px-0">
-              <div className="min-w-[580px] sm:min-w-full space-y-2">
-                {/* 星期表頭 */}
-                <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 text-center font-bold text-xs sm:text-sm">
-                  <div className="py-2.5 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">週日 (Sun)</div>
-                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週一 (Mon)</div>
-                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週二 (Tue)</div>
-                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週三 (Wed)</div>
-                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週四 (Thu)</div>
-                  <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週五 (Fri)</div>
-                  <div className="py-2.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">週六 (Sat)</div>
-                </div>
+          {/* 星期表頭 */}
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 text-center font-bold text-xs sm:text-sm">
+            <div className="py-2.5 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">週日 (Sun)</div>
+            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週一 (Mon)</div>
+            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週二 (Tue)</div>
+            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週三 (Wed)</div>
+            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週四 (Thu)</div>
+            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週五 (Fri)</div>
+            <div className="py-2.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">週六 (Sat)</div>
+          </div>
 
-                {/* 日曆網格 (Grid View) */}
-                <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5">
+          {/* 日曆網格 (Grid View) */}
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5">
             {/* 月初前的空白格子 */}
             {Array.from({ length: firstDayWeekday }).map((_, idx) => (
               <div
@@ -1693,23 +1630,38 @@ export default function App() {
               return (
                 <div
                   key={day.date}
-                  onClick={() => setSelectedDateStr(day.date)}
+                  onClick={() => {
+                    setSelectedDateStr(day.date);
+                    if (day.bookingStatus === 'upcoming') {
+                      setTimeout(() => {
+                        const el = document.getElementById('booking-reminder-card');
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }, 100);
+                    }
+                  }}
                   className={`relative cursor-pointer rounded-xl sm:rounded-2xl p-2 sm:p-3 border-2 flex flex-col justify-between transition-all duration-150 min-h-[92px] sm:min-h-[118px] group ${cardBg} ${flashStyle} ${
                     isSelected
                       ? 'ring-4 ring-indigo-600 ring-offset-2 shadow-lg z-10 scale-[1.02]'
                       : 'hover:shadow-md'
                   }`}
                 >
-                  {/* 第一行顯示：日期與星期 */}
+                  {/* 第一視覺元素：日期與星期 */}
                   <div className="flex items-start justify-between gap-1">
                     <div className="flex flex-col">
                       <span className="text-xs sm:text-sm font-black tracking-tight leading-tight">
                         {day.month}/{day.day} <span className="text-[11px] font-semibold text-slate-600">{day.weekdayStr}</span>
                       </span>
                       {day.bookingStatus === 'upcoming' ? (
-                        <span className="text-[10px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded mt-1 inline-block w-fit leading-none">
-                          ⌛ {day.saleOpenLabel}
-                        </span>
+                        <div className="flex flex-col gap-0.5 mt-1">
+                          <span className="text-[10px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded inline-block w-fit leading-none">
+                            ⏳ {day.saleOpenLabel}
+                          </span>
+                          <span className="text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-black px-1.5 py-0.5 rounded shadow-2xs inline-block w-fit leading-none">
+                            🔔 預約開賣
+                          </span>
+                        </div>
                       ) : day.eventNote ? (
                         <span className="text-[10px] text-rose-600 font-bold truncate max-w-[70px] sm:max-w-[90px] leading-none mt-0.5">
                           {day.eventNote}
@@ -1717,7 +1669,7 @@ export default function App() {
                       ) : null}
                     </div>
 
-                    {/* 票價等級標籤 */}
+                    {/* 第三視覺元素：價格等級標籤 */}
                     <span
                       className={`text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap leading-none ${badgeColor}`}
                     >
@@ -1725,13 +1677,13 @@ export default function App() {
                     </span>
                   </div>
 
-                  {/* 台幣價格 (即時日圓換算) */}
+                  {/* 第二視覺元素：台幣預估價格 (含突發促銷對比) */}
                   <div className="mt-2 text-right">
                     <div className="text-[10px] text-slate-500 font-medium">
                       {day.bookingStatus === 'upcoming' ? (
                         <span className="text-indigo-700 font-bold">預估開賣台幣</span>
                       ) : (
-                        <>預估台幣 {hasPromo && <span className="text-emerald-700 font-bold">(快閃特惠)</span>}</>
+                        <>預估台幣 {hasPromo && <span className="text-emerald-700 font-bold">(限時特惠)</span>}</>
                       )}
                     </div>
                     {hasPromo && (
@@ -1744,7 +1696,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 底部原幣與人潮指示 */}
+                  {/* 底部微型人潮指示 */}
                   <div className="mt-1 pt-1 border-t border-black/5 flex items-center justify-between text-[10px] text-slate-500">
                     <span className="tabular-nums font-bold">{day.currencySymbol}{ticketPriceVal.toLocaleString()}</span>
                     <span className="flex items-center gap-1 font-medium">
@@ -1759,9 +1711,6 @@ export default function App() {
                 </div>
               );
             })}
-          </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -1819,18 +1768,20 @@ export default function App() {
             {currentDayData.bookingStatus === 'upcoming' && (() => {
               const activeChar = getCharacterById(selectedCharacterId);
               return (
-                <div className={`${activeChar.cardBg} border-2 ${activeChar.cardBorder} rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 transition-all duration-300`}>
-                  <div className="space-y-1.5">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-black shadow-xs">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                      <span>⏰ 尚未到開放訂票時間（入園前 2 個月開賣）</span>
+                <div id="booking-reminder-card" className={`${activeChar.cardBg} border-2 ${activeChar.cardBorder} rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 transition-all duration-300 scroll-mt-24`}>
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-black shadow-xs">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span>⏰ 尚未到開放訂票時間（入園前 2 個月開賣）</span>
+                      </div>
+                      <h4 className="text-lg sm:text-xl font-black text-slate-900">
+                        想訂 <span className="text-indigo-700">{currentDayData.month}月{currentDayData.day}日</span> 的門票嗎？預計於 <span className="underline font-black text-rose-600">{currentDayData.saleOpenDate} 台灣時間 13:00</span> 開放預訂！
+                      </h4>
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                        不用自己設鬧鐘苦等！挑選您喜歡的<strong>迪士尼專屬守護角色</strong>，在下方選擇【LINE 一鍵預約】或【Email 專屬通知】，開賣第一秒準時推送專屬祝賀與訂票連結給您！
+                      </p>
                     </div>
-                    <h4 className="text-lg sm:text-xl font-black text-slate-900">
-                      想訂 <span className="text-indigo-700">{currentDayData.month}月{currentDayData.day}日</span> 的門票嗎？預計於 <span className="underline font-black text-rose-600">{currentDayData.saleOpenDate} 台灣時間 13:00</span> 開放預訂！
-                    </h4>
-                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                      不用自己設鬧鐘苦等！挑選您喜歡的<strong>迪士尼專屬守護角色</strong>，在下方選擇【LINE 一鍵預約】或【Email 專屬通知】，開賣第一秒準時推播專屬祝賀與訂票連結給您！
-                    </p>
                   </div>
 
                   {/* 👑 5 大迪士尼開賣通知角色選擇區 (使用參考圖高畫質立繪與角色專屬配色) */}
@@ -1905,47 +1856,37 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Email 預約送出表單 (按鈕與輸入框光暈隨選用角色配色) */}
-                    {/* 🎯 雙通道開賣預約中心：方式一 (LINE) / 方式二 (Email) */}
-                    <div className="pt-3 space-y-3.5 border-t border-slate-200/80">
-                      <div className="text-xs sm:text-sm font-black text-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <Bell className="w-4 h-4 text-rose-500 animate-pulse" />
-                          <span>選擇開賣通知方式（{currentDayData.month}月{currentDayData.day}日 開賣第一秒準時推播）：</span>
+                    {/* 選擇開賣通知方式：方式一 (LINE) / 方式二 (Email) */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <Bell className="w-4 h-4 text-indigo-600" />
+                          <span>🔔 選擇開賣通知方式（{currentDayData.month}月{currentDayData.day}日 開賣第一秒準時推播）：</span>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">任選一種即可完成登記</span>
+                        <span className="text-[11px] font-bold text-slate-500">任選一種即可完成登記</span>
                       </div>
 
-                      {/* 方式一：LINE 一鍵預約 (免打字直通) */}
-                      <div className="bg-emerald-50/90 border-2 border-emerald-300 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                          <div className="w-10 h-10 rounded-xl bg-[#06C755] flex items-center justify-center text-white text-xl font-bold shadow-xs shrink-0">
-                            💬
+                      {/* 【方式一】用 LINE 一鍵預約開賣 */}
+                      <div className="bg-emerald-50/70 border-2 border-[#06C755]/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-black text-emerald-900">【方式一】用 LINE 一鍵預約開賣</span>
+                            <span className="text-[10px] font-bold bg-[#06C755] text-white px-2 py-0.5 rounded-full">
+                              免打字 · 秒速登記
+                            </span>
                           </div>
-                          <div>
-                            <div className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-1.5">
-                              <span>【方式一】用 LINE 一鍵預約開賣</span>
-                              <span className="bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">免打字·秒速登記</span>
-                            </div>
-                            <div className="text-[11px] text-emerald-800 font-medium mt-0.5">
-                              點擊自動前往 LINE 並複製「{currentDayData.dateStr}」預約訊息，送出即可！
-                            </div>
-                          </div>
+                          <p className="text-xs text-slate-600">
+                            點擊自動前往 LINE 並複製「您好！我想預約 {currentDayData.date}【{currentPark.name}】開賣通知...」預約訊息，送出即可！
+                          </p>
                         </div>
-
-                        <a
-                          href={affiliateConfig.lineOfficialUrl || 'https://lin.ee/XnkEyyl'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                              navigator.clipboard.writeText(`您好！我想預約 ${currentDayData.dateStr}【${currentPark.name}】開賣通知與早鳥特惠 🏰✨`);
-                            }
-                          }}
-                          className="w-full sm:w-auto px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
+                        <button
+                          type="button"
+                          onClick={() => handleOpenLineModal(`${currentDayData.date}【${currentPark.name}】`)}
+                          className="px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
                         >
-                          <span>💬 點此用 LINE 預約</span>
-                        </a>
+                          <span className="text-base">💬</span>
+                          <span>點此用 LINE 預約</span>
+                        </button>
                       </div>
 
                       {/* 分隔線 OR */}
@@ -1957,7 +1898,7 @@ export default function App() {
                         <div className="flex-grow border-t border-slate-300/80"></div>
                       </div>
 
-                      {/* 方式二：Email 專屬圖文信 */}
+                      {/* 【方式二】Email 專屬通知 */}
                       <div className="space-y-1.5">
                         <div className="text-xs font-black text-slate-800 flex items-center gap-1">
                           <span>【方式二】由【{activeChar.shortName}】發送專屬 Email 開賣通知：</span>
@@ -1979,7 +1920,7 @@ export default function App() {
                             className={`px-6 py-3 bg-gradient-to-r ${activeChar.buttonGradient} ${activeChar.buttonText} font-black text-xs sm:text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer transition-all active:scale-95 disabled:opacity-60`}
                           >
                             <Bell className="w-4 h-4" />
-                            <span>由【${activeChar.shortName}】預約 Email 通知</span>
+                            <span>由【{activeChar.shortName}】預約 Email 通知</span>
                           </button>
                         </form>
                       </div>
@@ -2742,6 +2683,110 @@ export default function App() {
                 >
                   <Download className="w-4 h-4" />
                   <span>直接下載 .html 檔</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 💬 超高質感 LINE 官方加好友專屬彈窗 (桌面版點擊優雅浮現) */}
+      {showLineModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-center relative animate-in zoom-in-95 duration-200">
+            {/* 綠色質感品牌頂部 */}
+            <div className="bg-gradient-to-r from-[#06C755] to-[#05b34c] text-white p-5 sm:p-6 relative">
+              <button
+                type="button"
+                onClick={() => setShowLineModal(false)}
+                className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer transition-all"
+              >
+                ✕
+              </button>
+              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-black tracking-wide">
+                <span>🏰 海外樂園門票情報 · 官方 LINE 加好友</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black mt-1">加 LINE 即時鎖定開賣通知</h3>
+              <p className="text-xs text-white/90 mt-1">
+                零垃圾訊息 · 開賣第一秒準時推播提醒
+              </p>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4">
+              {/* 開賣預約自動記憶提示 */}
+              {lineModalTargetDate ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 font-bold flex items-center justify-center gap-2">
+                  <span className="text-base">✨</span>
+                  <span>已為您鎖定 <strong className="text-emerald-700 underline">{lineModalTargetDate}</strong> 預約訊息！</span>
+                </div>
+              ) : (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 font-bold flex items-center justify-center gap-2">
+                  <span className="text-base">✨</span>
+                  <span>已為您鎖定官方預約開賣推播管道！</span>
+                </div>
+              )}
+
+              {/* 自動複製提示標籤 */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-[11px] sm:text-xs text-slate-600 font-semibold flex items-center justify-center gap-2">
+                <span>📋</span>
+                <span>預約訊息已為您複製到剪貼簿，進入聊天室直接貼上即可！</span>
+              </div>
+
+              {/* 高解析度官方加好友 QR Code */}
+              <div className="flex flex-col items-center justify-center py-1">
+                <div className="p-3.5 bg-white border-2 border-slate-200 rounded-2xl shadow-sm inline-block">
+                  <img
+                    src="https://qr-official.line.me/gs/M_272tfkev_GW.png"
+                    alt="LINE 官方帳號 QR Code"
+                    className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                  />
+                </div>
+                <p className="text-xs font-bold text-slate-600 mt-2.5 flex items-center gap-1.5">
+                  <span>📱 拿起手機相機一掃，滴一聲立刻加好友！</span>
+                </p>
+              </div>
+
+              {/* 一鍵複製 Basic ID */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
+                <div className="text-left">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase">官方 LINE Basic ID</div>
+                  <div className="text-base font-black text-slate-900 tracking-wider">@272tfkev</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+                      navigator.clipboard.writeText('@272tfkev');
+                      setCopiedLineId(true);
+                      setTimeout(() => setCopiedLineId(false), 2000);
+                    }
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    copiedLineId
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                  }`}
+                >
+                  {copiedLineId ? <span>✓ 已複製 ID</span> : <span>一鍵複製 ID</span>}
+                </button>
+              </div>
+
+              {/* 電腦已安裝 LINE 快捷啟動 */}
+              <div className="pt-2 border-t border-slate-100 flex flex-col items-center gap-2">
+                <a
+                  href="https://lin.ee/XnkEyyl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1"
+                >
+                  <span>💻 若電腦已安裝 LINE，點此嘗試開啟</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowLineModal(false)}
+                  className="w-full py-2.5 text-xs text-slate-500 hover:text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  關閉視窗
                 </button>
               </div>
             </div>
