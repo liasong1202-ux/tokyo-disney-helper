@@ -214,13 +214,13 @@ export default function App() {
   const [copiedLineId, setCopiedLineId] = useState<boolean>(false);
   const [copiedLineMsg, setCopiedLineMsg] = useState<boolean>(false);
 
-  // 跨平台智慧 LINE 加好友彈窗與自動複製預約訊息
+  // 跨平台智慧 LINE 加好友彈窗與自動帶入預約訊息
   const handleOpenLineModal = (dateTarget?: string) => {
     const defaultMsg = dateTarget 
       ? `您好！我想預約 ${dateTarget} 開賣通知與早鳥特惠 🏰✨`
       : '您好！我想接收【海外樂園門票情報】開賣通知與早鳥特惠 🏰✨';
     
-    // 自動複製預約訊息至剪貼簿
+    // 自動複製預約訊息至剪貼簿 (作為防呆備援)
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(defaultMsg);
@@ -231,10 +231,13 @@ export default function App() {
       // ignore
     }
 
-    // 判斷是否為行動裝置
+    // 官方 LINE oaMessage 連結 (自帶預約訊息，開聊天室直接打好在輸入框)
+    const lineOaUrl = `https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent(defaultMsg)}`;
+
+    // 判斷是否為行動裝置：直接喚醒 LINE 並自動在輸入框帶好文字
     const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
-      window.location.href = 'https://lin.ee/XnkEyyl';
+      window.location.href = lineOaUrl;
       return;
     }
 
@@ -1872,11 +1875,11 @@ export default function App() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-black text-emerald-900">【方式一】用 LINE 一鍵預約開賣</span>
                             <span className="text-[10px] font-bold bg-[#06C755] text-white px-2 py-0.5 rounded-full">
-                              免打字 · 秒速登記
+                              免打字 · 免貼上 · 自動帶入
                             </span>
                           </div>
                           <p className="text-xs text-slate-600">
-                            點擊自動前往 LINE 並複製「您好！我想預約 {currentDayData.date}【{currentPark.name}】開賣通知...」預約訊息，送出即可！
+                            點擊立即開啟 LINE，系統已<strong>自動為您打好預約訊息</strong>，打開聊天室直接按「送出」即可！
                           </p>
                         </div>
                         <button
@@ -2690,109 +2693,119 @@ export default function App() {
         </div>
       )}
 
-      {/* 💬 超高質感 LINE 官方加好友專屬彈窗 (桌面版點擊優雅浮現) */}
-      {showLineModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-center relative animate-in zoom-in-95 duration-200">
-            {/* 綠色質感品牌頂部 */}
-            <div className="bg-gradient-to-r from-[#06C755] to-[#05b34c] text-white p-5 sm:p-6 relative">
-              <button
-                type="button"
-                onClick={() => setShowLineModal(false)}
-                className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer transition-all"
-              >
-                ✕
-              </button>
-              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-black tracking-wide">
-                <span>🏰 海外樂園門票情報 · 官方 LINE 加好友</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-black mt-1">加 LINE 即時鎖定開賣通知</h3>
-              <p className="text-xs text-white/90 mt-1">
-                零垃圾訊息 · 開賣第一秒準時推播提醒
-              </p>
-            </div>
+      {/* 💬 超高質感 LINE 官方加好友專屬彈窗 (自動預填預約訊息，免打字免貼上) */}
+      {showLineModal && (() => {
+        const targetMsg = lineModalTargetDate 
+          ? `您好！我想預約 ${lineModalTargetDate} 開賣通知與早鳥特惠 🏰✨`
+          : '您好！我想接收【海外樂園門票情報】開賣通知與早鳥特惠 🏰✨';
+        const targetLineUrl = `https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent(targetMsg)}`;
+        const dynamicQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(targetLineUrl)}`;
 
-            <div className="p-5 sm:p-6 space-y-4">
-              {/* 開賣預約自動記憶提示 */}
-              {lineModalTargetDate ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 font-bold flex items-center justify-center gap-2">
-                  <span className="text-base">✨</span>
-                  <span>已為您鎖定 <strong className="text-emerald-700 underline">{lineModalTargetDate}</strong> 預約訊息！</span>
-                </div>
-              ) : (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 font-bold flex items-center justify-center gap-2">
-                  <span className="text-base">✨</span>
-                  <span>已為您鎖定官方預約開賣推播管道！</span>
-                </div>
-              )}
-
-              {/* 自動複製提示標籤 */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-[11px] sm:text-xs text-slate-600 font-semibold flex items-center justify-center gap-2">
-                <span>📋</span>
-                <span>預約訊息已為您複製到剪貼簿，進入聊天室直接貼上即可！</span>
-              </div>
-
-              {/* 高解析度官方加好友 QR Code */}
-              <div className="flex flex-col items-center justify-center py-1">
-                <div className="p-3.5 bg-white border-2 border-slate-200 rounded-2xl shadow-sm inline-block">
-                  <img
-                    src="https://qr-official.line.me/gs/M_272tfkev_GW.png"
-                    alt="LINE 官方帳號 QR Code"
-                    className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
-                  />
-                </div>
-                <p className="text-xs font-bold text-slate-600 mt-2.5 flex items-center gap-1.5">
-                  <span>📱 拿起手機相機一掃，滴一聲立刻加好友！</span>
-                </p>
-              </div>
-
-              {/* 一鍵複製 Basic ID */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
-                <div className="text-left">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase">官方 LINE Basic ID</div>
-                  <div className="text-base font-black text-slate-900 tracking-wider">@272tfkev</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-                      navigator.clipboard.writeText('@272tfkev');
-                      setCopiedLineId(true);
-                      setTimeout(() => setCopiedLineId(false), 2000);
-                    }
-                  }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                    copiedLineId
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                  }`}
-                >
-                  {copiedLineId ? <span>✓ 已複製 ID</span> : <span>一鍵複製 ID</span>}
-                </button>
-              </div>
-
-              {/* 電腦已安裝 LINE 快捷啟動 */}
-              <div className="pt-2 border-t border-slate-100 flex flex-col items-center gap-2">
-                <a
-                  href="https://lin.ee/XnkEyyl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1"
-                >
-                  <span>💻 若電腦已安裝 LINE，點此嘗試開啟</span>
-                </a>
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-center relative animate-in zoom-in-95 duration-200">
+              {/* 綠色質感品牌頂部 */}
+              <div className="bg-gradient-to-r from-[#06C755] to-[#05b34c] text-white p-5 sm:p-6 relative">
                 <button
                   type="button"
                   onClick={() => setShowLineModal(false)}
-                  className="w-full py-2.5 text-xs text-slate-500 hover:text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
+                  className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer transition-all"
                 >
-                  關閉視窗
+                  ✕
                 </button>
+                <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-black tracking-wide">
+                  <span>🏰 海外樂園門票情報 · 官方 LINE 加好友</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black mt-1">加 LINE 即時鎖定開賣通知</h3>
+                <p className="text-xs text-white/90 mt-1">
+                  零垃圾訊息 · 開賣第一秒準時推播提醒
+                </p>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-4">
+                {/* 🚀 免打字、免貼上！自動帶入訊息提示 */}
+                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-3.5 text-xs text-emerald-950 font-bold space-y-1 shadow-2xs">
+                  <div className="flex items-center justify-center gap-1.5 text-sm font-black text-emerald-800">
+                    <span>🚀 訊息已為您自動打好！</span>
+                  </div>
+                  <p className="text-slate-600 font-medium">
+                    打開 LINE 聊天室<strong>文字已自動帶入輸入框</strong>，您只需直接按<strong>「送出 ✈️」</strong>即可完成登記！
+                  </p>
+                  {lineModalTargetDate && (
+                    <div className="pt-1 text-[11px] text-emerald-700 font-extrabold truncate">
+                      已預載：{lineModalTargetDate} 開賣通知
+                    </div>
+                  )}
+                </div>
+
+                {/* 動態高解析度 QR Code (手機相機一掃，自動開啟 LINE 並帶入文字) */}
+                <div className="flex flex-col items-center justify-center py-1">
+                  <div className="p-3 bg-white border-2 border-[#06C755]/30 rounded-2xl shadow-sm inline-block">
+                    <img
+                      src={dynamicQrCodeUrl}
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://qr-official.line.me/gs/M_272tfkev_GW.png';
+                      }}
+                      alt="LINE 官方帳號 QR Code"
+                      className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-slate-700 mt-2.5 flex items-center gap-1.5">
+                    <span>📱 拿起手機相機一掃，自動打開 LINE 並帶好訊息！</span>
+                  </p>
+                </div>
+
+                {/* 電腦已安裝 LINE 快捷啟動 */}
+                <div className="space-y-2">
+                  <a
+                    href={targetLineUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 px-4 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
+                  >
+                    <span>💬 電腦直接開啟 LINE（已自動帶入訊息）</span>
+                  </a>
+                </div>
+
+                {/* 一鍵複製 Basic ID 備援 */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-3 text-xs">
+                  <div className="text-left">
+                    <span className="text-slate-500 font-medium">官方 Basic ID：</span>
+                    <strong className="text-slate-900 font-black ml-1">@272tfkev</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText('@272tfkev');
+                        setCopiedLineId(true);
+                        setTimeout(() => setCopiedLineId(false), 2000);
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      copiedLineId
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {copiedLineId ? <span>✓ 已複製</span> : <span>複製 ID</span>}
+                  </button>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLineModal(false)}
+                    className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 font-bold rounded-lg transition-all cursor-pointer"
+                  >
+                    關閉視窗
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
