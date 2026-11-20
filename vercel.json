@@ -3,6 +3,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/line-webhook",
+      "destination": "/api/line-webhook"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

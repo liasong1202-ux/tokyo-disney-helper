@@ -289,6 +289,7 @@ export default function App() {
     }
     return 'mickey';
   });
+  const activeChar = getCharacterById(selectedCharacterId);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   // 站長後台 Modal (支援 ?admin=1 直接開啟)

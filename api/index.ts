@@ -1174,18 +1174,18 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   }
 
   // 11. 站長後台：預覽 5 大迪士尼角色的開賣通知 Email HTML
-  if (pathname === '/api/admin/preview-open-email' && (req.method === 'GET' || req.method === 'POST')) {
+  if ((pathname === '/api/admin/preview-open-email' || pathname === '/api/preview-open-email' || pathname === '/api/admin/preview-ticket-open-email') && (req.method === 'GET' || req.method === 'POST')) {
     try {
       const store = loadStore();
       const body = req.method === 'POST' ? await readJsonBody(req) : {};
-      const targetDate = body.targetDate || urlObj.searchParams.get('date') || '2027-01-15';
-      const parkLabel = body.parkLabel || '🏰 迪士尼陸地';
-      const characterId = body.characterId || urlObj.searchParams.get('char') || 'mickey';
+      const targetDate = body.targetDate || urlObj.searchParams.get('targetDate') || urlObj.searchParams.get('date') || '2027-01-04';
+      const parkLabel = body.parkLabel || urlObj.searchParams.get('park') || '🏰 東京迪士尼樂園 / 海洋';
+      const characterId = body.characterId || urlObj.searchParams.get('characterId') || urlObj.searchParams.get('char') || 'minnie';
       const customNote = body.customNote || undefined;
 
       const html = buildTicketOpenEmailHtml(store, targetDate, parkLabel, customNote, characterId);
       
-      if (urlObj.searchParams.get('raw') === '1') {
+      if (urlObj.searchParams.get('raw') === '1' || req.method === 'GET') {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.end(html);
