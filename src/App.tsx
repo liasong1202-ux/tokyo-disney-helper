@@ -240,14 +240,17 @@ export default function App() {
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
   const [showLineModal, setShowLineModal] = useState<boolean>(false);
   const [lineModalTargetDate, setLineModalTargetDate] = useState<string>('');
+  const [lineModalCharName, setLineModalCharName] = useState<string>('米妮');
   const [copiedLineId, setCopiedLineId] = useState<boolean>(false);
   const [copiedLineMsg, setCopiedLineMsg] = useState<boolean>(false);
 
   // 跨平台智慧 LINE 加好友彈窗與自動帶入預約訊息
-  const handleOpenLineModal = (dateTarget?: string) => {
+  const handleOpenLineModal = (dateTarget?: string, charName?: string) => {
+    const finalChar = charName || '米妮';
+    const charPart = `，指定【${finalChar}】為專屬守護大使`;
     const defaultMsg = dateTarget 
-      ? `您好！我想預約 ${dateTarget} 開賣通知與早鳥特惠 🏰✨`
-      : '您好！我想接收【海外樂園門票情報】開賣通知與早鳥特惠 🏰✨';
+      ? `您好！我想預約 ${dateTarget} 開賣通知${charPart}與早鳥特惠 🏰✨`
+      : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與早鳥特惠 🏰✨`;
     
     // 自動複製預約訊息至剪貼簿 (作為防呆備援)
     try {
@@ -272,6 +275,7 @@ export default function App() {
 
     // 電腦桌面端：彈出超高質感官方加好友 QR Code 彈窗
     setLineModalTargetDate(dateTarget || '');
+    setLineModalCharName(finalChar);
     setShowLineModal(true);
   };
 
@@ -1302,7 +1306,7 @@ export default function App() {
             {/* LINE 官方通知推播按鈕 */}
             <button
               type="button"
-              onClick={() => handleOpenLineModal()}
+              onClick={() => handleOpenLineModal(undefined, activeChar.shortName)}
               className="px-3.5 py-1.5 text-xs font-black text-white bg-[#06C755] hover:bg-[#05b34c] transition-all rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer active:scale-95"
             >
               <span>💬</span>
@@ -1922,7 +1926,7 @@ export default function App() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleOpenLineModal(`${currentDayData.date}【${currentPark.name}】`)}
+                          onClick={() => handleOpenLineModal(`${currentDayData.date}【${currentPark.name}】`, activeChar.shortName)}
                           className="px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
                         >
                           <span className="text-base">💬</span>
@@ -2717,9 +2721,10 @@ export default function App() {
 
       {/* 💬 超高質感 LINE 官方加好友專屬彈窗 (自動預填預約訊息，免打字免貼上) */}
       {showLineModal && (() => {
+        const charPart = `，指定【${lineModalCharName || '米妮'}】為專屬守護大使`;
         const targetMsg = lineModalTargetDate 
-          ? `您好！我想預約 ${lineModalTargetDate} 開賣通知與早鳥特惠 🏰✨`
-          : '您好！我想接收【海外樂園門票情報】開賣通知與早鳥特惠 🏰✨';
+          ? `您好！我想預約 ${lineModalTargetDate} 開賣通知${charPart}與早鳥特惠 🏰✨`
+          : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與早鳥特惠 🏰✨`;
         const targetLineUrl = `https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent(targetMsg)}`;
         const dynamicQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(targetLineUrl)}`;
 
@@ -2746,7 +2751,7 @@ export default function App() {
 
               <div className="p-5 sm:p-6 space-y-4">
                 {/* 📱 手機掃描導引提示 */}
-                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-3.5 text-xs text-emerald-950 font-bold space-y-1.5 shadow-2xs">
+                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-3.5 text-xs text-emerald-950 font-bold space-y-2 shadow-2xs">
                   <div className="flex items-center justify-center gap-1.5 text-sm font-black text-emerald-800">
                     <span>📱 請拿起手機相機掃描下方 QR Code</span>
                   </div>
@@ -2755,9 +2760,13 @@ export default function App() {
                   </p>
                   {lineModalTargetDate && (
                     <div className="pt-1 text-[11px] text-emerald-700 font-extrabold truncate">
-                      ✨ 已為您鎖定：{lineModalTargetDate} 開賣通知
+                      ✨ 已為您鎖定：{lineModalTargetDate} 開賣通知（守護大使：{lineModalCharName || '米妮'} 🎀）
                     </div>
                   )}
+                  <div className="bg-white/90 border border-emerald-200 rounded-xl p-2.5 text-[11px] text-slate-700 font-mono text-left break-all shadow-inner">
+                    <span className="text-emerald-700 font-bold block mb-1">💬 LINE 自動帶入訊息預覽：</span>
+                    {targetMsg}
+                  </div>
                 </div>
 
                 {/* 動態高解析度 QR Code (手機相機一掃，自動開啟 LINE 並帶入文字) */}
