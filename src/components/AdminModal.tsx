@@ -34,14 +34,25 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [loading, setLoading] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Dashboard 資料
+  // Dashboard 資料 (結合本地持久化，確保冷啟動零掉單)
+  const getInitialClickCounts = () => {
+    try {
+      const saved = localStorage.getItem('disney_click_counts');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { Klook: 0, KKday: 0, Official: 0 };
+  };
+  const getInitialRecentClicks = () => {
+    try {
+      const saved = localStorage.getItem('disney_recent_clicks');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  };
+
   const [subscribers, setSubscribers] = useState<any[]>([]);
-  const [clickCounts, setClickCounts] = useState<{ Klook: number; KKday: number; Official: number }>({
-    Klook: 0,
-    KKday: 0,
-    Official: 0,
-  });
-  const [recentClicks, setRecentClicks] = useState<any[]>([]);
+  const [clickCounts, setClickCounts] = useState<{ Klook: number; KKday: number; Official: number }>(getInitialClickCounts);
+  const [recentClicks, setRecentClicks] = useState<any[]>(getInitialRecentClicks);
   const [emailHistory, setEmailHistory] = useState<any[]>([]);
   const [exchangeRateCache, setExchangeRateCache] = useState<any>(null);
 
@@ -221,6 +232,9 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
       });
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
+        // 若伺服器仍在構建或非 JSON，仍保持本地點擊即時數據
+        setClickCounts(getInitialClickCounts());
+        setRecentClicks(getInitialRecentClicks());
         setLoading(false);
         return;
       }
@@ -232,8 +246,23 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
       }
       if (data.ok) {
         setSubscribers(data.subscribers || []);
-        setClickCounts(data.clickCounts || { Klook: 0, KKday: 0, Official: 0 });
-        setRecentClicks(data.recentClicks || []);
+
+        // 整合伺服器數據與本地儲存（取最大值，確保不被空白冷啟動洗掉）
+        const localCounts = getInitialClickCounts();
+        const mergedKlook = Math.max((data.clickCounts?.Klook || 0), (localCounts.Klook || 0));
+        const mergedKkday = Math.max((data.clickCounts?.KKday || 0), (localCounts.KKday || 0));
+        const mergedOfficial = Math.max((data.clickCounts?.Official || 0), (localCounts.Official || 0));
+        setClickCounts({ Klook: mergedKlook, KKday: mergedKkday, Official: mergedOfficial });
+
+        const localClicks = getInitialRecentClicks();
+        const apiClicks = data.recentClicks || [];
+        const clickMap = new Map();
+        [...localClicks, ...apiClicks].forEach(c => {
+          if (c && c.id && !clickMap.has(c.id)) clickMap.set(c.id, c);
+        });
+        const mergedRecent = Array.from(clickMap.values()).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setRecentClicks(mergedRecent.slice(0, 50));
+
         setEmailHistory(data.emailHistory || []);
         setExchangeRateCache(data.exchangeRateCache || null);
 

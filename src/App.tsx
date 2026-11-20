@@ -557,7 +557,27 @@ export default function App() {
       ? calculatePrice(currentDayData.basePriceJpy[ticketType]).finalTwd
       : 1900;
 
-    // 非同步記錄後端點擊數據
+    // 1. 本地持久化記錄（零延遲雙重保險）
+    try {
+      const storedCounts = JSON.parse(localStorage.getItem('disney_click_counts') || '{"Klook":0,"KKday":0,"Official":0}');
+      storedCounts[platform] = (storedCounts[platform] || 0) + 1;
+      localStorage.setItem('disney_click_counts', JSON.stringify(storedCounts));
+
+      const storedClicks = JSON.parse(localStorage.getItem('disney_recent_clicks') || '[]');
+      storedClicks.unshift({
+        id: `clk-${Date.now()}`,
+        platform,
+        dateStr: selectedDateStr,
+        park: selectedPark,
+        ticketType,
+        priceTwd,
+        source: 'web',
+        timestamp: new Date().toISOString()
+      });
+      localStorage.setItem('disney_recent_clicks', JSON.stringify(storedClicks.slice(0, 50)));
+    } catch {}
+
+    // 2. 非同步記錄後端點擊數據
     fetch('/api/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
