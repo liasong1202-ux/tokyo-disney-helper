@@ -246,7 +246,8 @@ export default function App() {
 
   // 跨平台智慧 LINE 加好友彈窗與自動帶入預約訊息
   const handleOpenLineModal = (dateTarget?: string, charName?: string) => {
-    const finalChar = charName || '米妮';
+    const currentChar = getCharacterById(selectedCharacterId);
+    const finalChar = charName || currentChar.shortName || '米妮';
     const charPart = `，指定【${finalChar}】為專屬守護大使`;
     const defaultMsg = dateTarget 
       ? `您好！我想預約 ${dateTarget} 開賣通知${charPart}與早鳥特惠 🏰✨`
@@ -1915,13 +1916,15 @@ export default function App() {
                       <div className="bg-emerald-50/70 border-2 border-[#06C755]/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-black text-emerald-900">【方式一】用 LINE 一鍵預約開賣</span>
+                            <span className="text-sm font-black text-emerald-900">
+                              【方式一】由【{activeChar.shortName}】在 LINE 為您發送開賣提醒
+                            </span>
                             <span className="text-[10px] font-bold bg-[#06C755] text-white px-2 py-0.5 rounded-full">
-                              免打字 · 免貼上 · 自動帶入
+                              免打字 · 自動帶入
                             </span>
                           </div>
                           <p className="text-xs text-slate-600">
-                            點擊立即開啟 LINE，系統已<strong>自動為您打好預約訊息</strong>，打開聊天室直接按「送出」即可！
+                            加好友後由<strong>【{activeChar.title}】</strong>在開賣第一秒於 LINE 即時推播提醒您！
                           </p>
                         </div>
                         <button
@@ -1930,7 +1933,7 @@ export default function App() {
                           className="px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
                         >
                           <span className="text-base">💬</span>
-                          <span>點此用 LINE 預約</span>
+                          <span>由【{activeChar.shortName}】在 LINE 提醒我</span>
                         </button>
                       </div>
 
@@ -2719,9 +2722,10 @@ export default function App() {
         </div>
       )}
 
-      {/* 💬 超高質感 LINE 官方加好友專屬彈窗 (自動預填預約訊息，免打字免貼上) */}
+      {/* 💬 超高質感 LINE 官方加好友專屬彈窗 (全面融入所選角色頭像、配色與私房對話) */}
       {showLineModal && (() => {
-        const charPart = `，指定【${lineModalCharName || '米妮'}】為專屬守護大使`;
+        const modalChar = DISNEY_CHARACTERS.find(c => c.shortName === lineModalCharName || c.name.includes(lineModalCharName)) || activeChar;
+        const charPart = `，指定【${modalChar.shortName}】為專屬守護大使`;
         const targetMsg = lineModalTargetDate 
           ? `您好！我想預約 ${lineModalTargetDate} 開賣通知${charPart}與早鳥特惠 🏰✨`
           : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與早鳥特惠 🏰✨`;
@@ -2731,40 +2735,68 @@ export default function App() {
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-center relative animate-in zoom-in-95 duration-200">
-              {/* 綠色質感品牌頂部 */}
-              <div className="bg-gradient-to-r from-[#06C755] to-[#05b34c] text-white p-5 sm:p-6 relative">
+              {/* 角色與 LINE 雙品牌精緻 Header */}
+              <div 
+                style={{ background: modalChar.emailBgGradient }}
+                className="text-white p-5 sm:p-6 relative overflow-hidden"
+              >
                 <button
                   type="button"
                   onClick={() => setShowLineModal(false)}
-                  className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer transition-all"
+                  className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer transition-all z-10"
                 >
                   ✕
                 </button>
-                <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-black tracking-wide">
-                  <span>🏰 海外樂園門票情報 · 官方 LINE 加好友</span>
+                
+                {/* 角色大頭貼立體徽章 */}
+                <div className="w-20 h-20 rounded-full overflow-hidden border-3 border-white shadow-lg mx-auto mb-2.5 bg-white flex items-center justify-center relative">
+                  <img
+                    src={modalChar.avatarUrl}
+                    alt={modalChar.name}
+                    className="w-full h-full object-contain p-1"
+                  />
+                  <div className="absolute bottom-0 right-0 bg-[#06C755] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-xs border border-white">
+                    LINE
+                  </div>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black mt-1">加 LINE 即時鎖定開賣通知</h3>
-                <p className="text-xs text-white/90 mt-1">
-                  零垃圾訊息 · 開賣第一秒準時推播提醒
+
+                <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-xs px-3 py-0.5 rounded-full text-xs font-black mb-1">
+                  <span>🏰 開賣通知專屬守護大使</span>
+                </div>
+                
+                <h3 className="text-xl sm:text-2xl font-black mt-0.5">
+                  由【{modalChar.name}】在 LINE 提醒您！
+                </h3>
+                <p className="text-xs text-white/95 mt-1 font-extrabold">
+                  「{modalChar.greeting}」
                 </p>
               </div>
 
               <div className="p-5 sm:p-6 space-y-4">
+                {/* 角色私房悄悄話提示 */}
+                <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3 text-xs text-slate-700 text-left flex items-start gap-2.5">
+                  <span className="text-lg shrink-0">💌</span>
+                  <div>
+                    <strong className="text-amber-950 font-black block">【{modalChar.title}】給您的悄悄話：</strong>
+                    <span className="text-slate-600 font-medium">「掃描下方 QR Code 送出預約後，開賣當天第一秒，我會親自在 LINE 把最新優惠搶票連結發送給您唷！」</span>
+                  </div>
+                </div>
+
                 {/* 📱 手機掃描導引提示 */}
                 <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-3.5 text-xs text-emerald-950 font-bold space-y-2 shadow-2xs">
                   <div className="flex items-center justify-center gap-1.5 text-sm font-black text-emerald-800">
                     <span>📱 請拿起手機相機掃描下方 QR Code</span>
                   </div>
                   <p className="text-slate-600 font-medium">
-                    手機一掃自動打開 LINE 聊天室，<strong>預約訊息已為您自動打好</strong>，直接按<strong>「送出 ✈️」</strong>即可完成登記！
+                    手機一掃自動打開 LINE 聊天室，<strong>由【{modalChar.shortName}】守護的預約訊息已自動打好</strong>，直接按<strong>「送出 ✈️」</strong>即可完成登記！
                   </p>
                   {lineModalTargetDate && (
                     <div className="pt-1 text-[11px] text-emerald-700 font-extrabold truncate">
-                      ✨ 已為您鎖定：{lineModalTargetDate} 開賣通知（守護大使：{lineModalCharName || '米妮'} 🎀）
+                      ✨ 已為您鎖定：{lineModalTargetDate} 開賣通知（守護大使：{modalChar.shortName} 🎀）
                     </div>
                   )}
-                  <div className="bg-white/90 border border-emerald-200 rounded-xl p-2.5 text-[11px] text-slate-700 font-mono text-left break-all shadow-inner">
-                    <span className="text-emerald-700 font-bold block mb-1">💬 LINE 自動帶入訊息預覽：</span>
+                  <div className="bg-white/95 border border-emerald-300 rounded-xl p-2.5 text-[11px] text-slate-700 font-mono text-left break-all shadow-inner">
+                    <span className="text-emerald-700 font-bold block mb-1">💬 LINE 自動帶入預約訊息：</span>
                     {targetMsg}
                   </div>
                 </div>
