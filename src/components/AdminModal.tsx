@@ -100,7 +100,10 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     '站長實測這波折扣碼剛釋出還有名額！建議挑選日曆上綠色（¥8,900~9,400）的平日入園，搭配折扣碼省最多！'
   );
 
-  // Resend 設定表單
+  // 寄信設定表單 (支援 Gmail 免費寄信與 Resend)
+  const [gmailUser, setGmailUser] = useState('');
+  const [gmailAppPassword, setGmailAppPassword] = useState('');
+  const [hasGmail, setHasGmail] = useState(false);
   const [resendApiKey, setResendApiKey] = useState('');
   const [fromEmail, setFromEmail] = useState('onboarding@resend.dev');
   const [fromName, setFromName] = useState('東京迪士尼降價與人潮預報助手');
@@ -354,6 +357,10 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           setResendApiKey(data.emailSettings.resendApiKey || '');
           setFromEmail(data.emailSettings.fromEmail || 'onboarding@resend.dev');
           setFromName(data.emailSettings.fromName || '東京迪士尼降價與人潮預報助手');
+          setHasGmail(Boolean(data.emailSettings.hasGmail));
+          if (data.emailSettings.gmailUser) {
+            setGmailUser(data.emailSettings.gmailUser);
+          }
         }
         if (data.storageStatus) {
           setStorageStatus(data.storageStatus);
@@ -552,17 +559,20 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     onStateUpdated();
   };
 
-  // 儲存 Resend API 設定 (永久儲存至 localStorage)
+  // 儲存寄信設定 (Gmail / Resend)
   const handleSaveResend = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     const emailData = {
+      gmailUser: gmailUser.trim(),
+      gmailAppPassword: gmailAppPassword.replace(/\s+/g, ''),
       resendApiKey,
       fromEmail,
       fromName,
     };
     localStorage.setItem('tokyo_disney_email_settings', JSON.stringify(emailData));
-    setHasResendKey(Boolean(resendApiKey.trim()));
+    if (resendApiKey.trim()) setHasResendKey(true);
+    if (gmailUser.trim() && gmailAppPassword.trim()) setHasGmail(true);
 
     try {
       fetch('/api/admin/email-settings', {
@@ -817,7 +827,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
             { id: 'affiliate', label: '🔗 聯盟行銷連結設定', icon: Link2 },
             { id: 'promo', label: '⚡ 發布降價特惠 & 群發信', icon: Send },
             { id: 'subscribers', label: `👥 訂閱名單 (${subscribers.length})`, icon: Users },
-            { id: 'resend', label: '🔑 Resend 寄信設定', icon: KeyRound },
+            { id: 'resend', label: '✉️ 寄信設定 (Gmail/Resend)', icon: KeyRound },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -838,21 +848,28 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           })}
         </div>
 
-        {/* 提示訊息橫幅 */}
+        {/* 提示訊息橫幅 (固定懸浮於視窗最上方，確保捲動後也能一眼看見) */}
         {toastMsg && (
           <div
-            className={`mx-6 mt-4 p-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shrink-0 ${
+            className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] max-w-xl w-[92%] p-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2.5 shadow-2xl border-2 ${
               toastMsg.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                : 'bg-rose-50 text-rose-800 border border-rose-300'
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-400'
+                : 'bg-rose-50 text-rose-900 border-rose-400'
             }`}
           >
             {toastMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
             )}
-            <span>{toastMsg.text}</span>
+            <span className="flex-1">{toastMsg.text}</span>
+            <button
+              type="button"
+              onClick={() => setToastMsg(null)}
+              className="text-slate-400 hover:text-slate-700 text-xs px-1.5 py-0.5 rounded cursor-pointer"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -1656,10 +1673,19 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                   <button
                     onClick={() => handleSendTicketOpenAlert()}
                     disabled={loading}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>🎟️ 群發開賣通知信</span>
+                    {loading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>寄送中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>🎟️ 群發開賣通知信</span>
+                      </>
+                    )}
                   </button>
                   <button
                     onClick={handleExportCsv}
@@ -1807,74 +1833,122 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
             </div>
           )}
 
-          {/* TAB 5: Resend 寄信設定 */}
+          {/* TAB 5: Gmail 免費寄信與 Resend 設定 */}
           {activeTab === 'resend' && (
             <form onSubmit={handleSaveResend} className="space-y-5">
-              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-xs text-indigo-950 space-y-2">
-                <div className="font-black text-sm flex items-center justify-between">
-                  <span>📬 如何免費取得 Resend API Key？（每月免費寄 3,000 封信）</span>
+              {/* 方案 A: Gmail 免費寄信 (推薦) */}
+              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 text-xs text-emerald-950 space-y-2.5">
+                <div className="font-black text-sm flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5">
+                    <span>📧 Gmail 免費寄信引擎（推薦！0 元免買網域・可寄給任何人）</span>
+                    {hasGmail && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px]">
+                        ✅ 已連線生效
+                      </span>
+                    )}
+                  </span>
+                  <a
+                    href="https://myaccount.google.com/apppasswords"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 shadow-2xs"
+                  >
+                    <span>前往取得 16 位數密碼</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-emerald-900">
+                  <li>
+                    點擊右上角綠色按鈕前往 Google 帳號 <strong>「應用程式密碼」</strong>（需先開啟 Google 兩步驟驗證）。
+                  </li>
+                  <li>
+                    輸入名稱（例如 <code>迪士尼小幫手</code>），按建立後會出現一組 <strong>16 位數英文字母密碼</strong>。
+                  </li>
+                  <li>
+                    在下方填入您的 Gmail 與該 16 位數密碼按儲存，即可**免費每日寄 500 封給全世界任何信箱**！
+                  </li>
+                </ol>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="block text-xs font-bold text-emerald-900 mb-1">
+                      📧 您的 Gmail 信箱
+                    </label>
+                    <input
+                      type="email"
+                      value={gmailUser}
+                      onChange={(e) => setGmailUser(e.target.value)}
+                      placeholder="liasong1202@gmail.com"
+                      className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-emerald-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-emerald-900 mb-1">
+                      🔐 Google 16 位數應用程式密碼 {hasGmail && <span className="text-emerald-700">(✅ 已設定)</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={gmailAppPassword}
+                      onChange={(e) => setGmailAppPassword(e.target.value)}
+                      placeholder={hasGmail ? '•••••••••••••••• (已設定，留空則維持原密碼)' : 'xxxx xxxx xxxx xxxx'}
+                      className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-emerald-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    寄件人顯示名稱
+                  </label>
+                  <input
+                    type="text"
+                    value={fromName}
+                    onChange={(e) => setFromName(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Resend 備援寄件信箱 (僅使用 Resend 時需要)
+                  </label>
+                  <input
+                    type="text"
+                    value={fromEmail}
+                    onChange={(e) => setFromEmail(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-700 space-y-2">
+                <div className="font-bold flex items-center justify-between">
+                  <span>🔑 備選：Resend API Key (需綁定個人網域才能寄給別人)</span>
                   <a
                     href="https://resend.com/api-keys"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-600 hover:underline flex items-center gap-1"
                   >
-                    前往 Resend 官網 <ExternalLink className="w-3.5 h-3.5" />
+                    Resend 官網 <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
-                <ol className="list-decimal list-inside space-y-1 text-indigo-900">
-                  <li>點右上角前往 <strong>Resend.com</strong> 用 Google 或 GitHub 帳號免費註冊登入。</li>
-                  <li>點左側選單的 <strong>API Keys</strong> 👉 點 <strong>Create API Key</strong>。</li>
-                  <li>把產生的那串 <code>re_xxxxxxxxx</code> 開頭的金鑰複製起來，貼到下方欄位按儲存即可！</li>
-                </ol>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    🔑 Resend API Key {hasResendKey && <span className="text-emerald-600">(✅ 已設定)</span>}
-                  </label>
-                  <input
-                    type="password"
-                    value={resendApiKey}
-                    onChange={(e) => setResendApiKey(e.target.value)}
-                    placeholder="re_123456789_abcdefghijklmnop..."
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      寄件人顯示名稱
-                    </label>
-                    <input
-                      type="text"
-                      value={fromName}
-                      onChange={(e) => setFromName(e.target.value)}
-                      className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      寄件信箱 (免費測試用預設 onboarding@resend.dev 即可)
-                    </label>
-                    <input
-                      type="text"
-                      value={fromEmail}
-                      onChange={(e) => setFromEmail(e.target.value)}
-                      className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl font-mono"
-                    />
-                  </div>
-                </div>
+                <input
+                  type="password"
+                  value={resendApiKey}
+                  onChange={(e) => setResendApiKey(e.target.value)}
+                  placeholder={hasResendKey ? 're_•••••••••••• (已設定，留空則維持原金鑰)' : 're_123456789_abcdefghijklmnop...'}
+                  className="w-full px-3.5 py-2 text-xs border border-slate-300 bg-white rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-md transition-all cursor-pointer"
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-xl shadow-md transition-all cursor-pointer"
               >
-                💾 儲存 Resend 寄信設定
+                💾 儲存寄信設定（立即生效）
               </button>
             </form>
           )}

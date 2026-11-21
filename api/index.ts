@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { IncomingMessage, ServerResponse } from 'http';
+import nodemailer from 'nodemailer';
 
 const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'store.json');
@@ -283,6 +284,8 @@ export interface EmailSettings {
   fromEmail: string;
   fromName: string;
   adminPassword: string;
+  gmailUser?: string;
+  gmailAppPassword?: string;
 }
 
 export interface LineSettings {
@@ -375,6 +378,8 @@ const DEFAULT_STORE: StoreData = {
     fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
     fromName: '東京迪士尼降價與人潮預報助手',
     adminPassword: process.env.ADMIN_PASSWORD || 'disney888',
+    gmailUser: (process.env.GMAIL_USER || '').trim(),
+    gmailAppPassword: (process.env.GMAIL_APP_PASSWORD || '').trim(),
   },
   lineSettings: {
     channelAccessToken: '',
@@ -421,6 +426,8 @@ function mergeWithDefaultStore(parsed: any): StoreData {
       ...(safeParsed.emailSettings || {}),
       resendApiKey: safeParsed.emailSettings?.resendApiKey || (process.env.RESEND_API_KEY || '').trim(),
       adminPassword: safeParsed.emailSettings?.adminPassword || (process.env.ADMIN_PASSWORD || '').trim() || 'disney888',
+      gmailUser: safeParsed.emailSettings?.gmailUser || (process.env.GMAIL_USER || '').trim(),
+      gmailAppPassword: safeParsed.emailSettings?.gmailAppPassword || (process.env.GMAIL_APP_PASSWORD || '').trim(),
     },
     lineSettings: {
       channelAccessToken: safeParsed.lineSettings?.channelAccessToken || '',
@@ -661,6 +668,67 @@ async function sendResendEmail(params: {
   } catch (err: any) {
     return { ok: false, error: err?.message || '發信網路連線失敗' };
   }
+}
+
+function hasGmailConfigured(store: StoreData): boolean {
+  const user = (store.emailSettings.gmailUser || process.env.GMAIL_USER || '').trim();
+  const pass = (store.emailSettings.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || '').trim();
+  return Boolean(user && pass);
+}
+
+function hasAnyEmailProvider(store: StoreData): boolean {
+  return hasGmailConfigured(store) || Boolean(store.emailSettings.resendApiKey && store.emailSettings.resendApiKey.trim());
+}
+
+// 統一寄信引擎：優先使用 Gmail SMTP（0 元免買網域，可寄給全世界任何人），其次使用 Resend
+async function sendUnifiedEmail(
+  store: StoreData,
+  params: { to: string[]; subject: string; html: string }
+): Promise<{ ok: boolean; id?: string; error?: string; provider?: 'gmail' | 'resend' }> {
+  const gmailUser = (store.emailSettings.gmailUser || process.env.GMAIL_USER || '').trim();
+  const gmailPass = (store.emailSettings.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
+  const fromName = store.emailSettings.fromName || '東京迪士尼降價與人潮預報助手';
+
+  if (gmailUser && gmailPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: gmailUser,
+          pass: gmailPass,
+        },
+      });
+      const info = await transporter.sendMail({
+        from: `"${fromName}" <${gmailUser}>`,
+        to: params.to.join(','),
+        subject: params.subject,
+        html: params.html,
+      });
+      return { ok: true, id: info.messageId, provider: 'gmail' };
+    } catch (err: any) {
+      return {
+        ok: false,
+        error: `Gmail 寄信失敗：${err?.message || '請檢查 Gmail 信箱與 16 位數應用程式密碼是否正確'}`,
+        provider: 'gmail',
+      };
+    }
+  }
+
+  if (store.emailSettings.resendApiKey && store.emailSettings.resendApiKey.trim()) {
+    const resResult = await sendResendEmail({
+      apiKey: store.emailSettings.resendApiKey,
+      from: `${fromName} <${store.emailSettings.fromEmail}>`,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    });
+    return { ...resResult, provider: 'resend' };
+  }
+
+  return {
+    ok: false,
+    error: '尚未設定寄信帳號！請至「✉️ 寄信設定」填入 Gmail 與 16 位數應用程式密碼（免費可寄給任何人）。',
+  };
 }
 
 const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://tokyo-disney-helper.vercel.app').replace(/\/+$/, '');
@@ -1444,16 +1512,13 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         await saveStore(store);
       }
 
-      // 若有設定 Resend API Key，自動寄送歡迎確認信
+      // 若有設定寄信服務 (Gmail 或 Resend)，自動寄送歡迎確認信
       let welcomeEmailSent = false;
-      if (store.emailSettings.resendApiKey) {
-        const fromHeader = `${store.emailSettings.fromName} <${store.emailSettings.fromEmail}>`;
+      if (hasAnyEmailProvider(store)) {
         const subject = targetDate
           ? `🎟️ 開賣提醒設定成功！東京迪士尼【${targetDate}】開放訂票將立即通知您`
           : '🏰 訂閱成功！東京迪士尼門票降價與開放訂票通知';
-        const emailResult = await sendResendEmail({
-          apiKey: store.emailSettings.resendApiKey,
-          from: fromHeader,
+        const emailResult = await sendUnifiedEmail(store, {
           to: [email],
           subject,
           html: buildWelcomeEmailHtml(store, subscriber),
@@ -1688,6 +1753,9 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         resendApiKey: store.emailSettings.resendApiKey,
         fromEmail: store.emailSettings.fromEmail,
         fromName: store.emailSettings.fromName,
+        hasGmail: hasGmailConfigured(store),
+        gmailUser: (store.emailSettings.gmailUser || process.env.GMAIL_USER || '').trim(),
+        hasGmailAppPassword: Boolean((store.emailSettings.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || '').trim()),
       },
       lineSettings: {
         hasToken: Boolean(effectiveLineToken),
@@ -1743,6 +1811,15 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
       const body = await readJsonBody(req);
+      if (typeof body.gmailUser === 'string') {
+        store.emailSettings.gmailUser = body.gmailUser.trim();
+      }
+      if (typeof body.gmailAppPassword === 'string') {
+        const cleanPass = body.gmailAppPassword.replace(/\s+/g, '');
+        if (cleanPass) {
+          store.emailSettings.gmailAppPassword = cleanPass;
+        }
+      }
       if (typeof body.resendApiKey === 'string') {
         const trimmed = body.resendApiKey.trim();
         // 防呆機制：若留空且目前已有金鑰，保留現有金鑰不洗掉
@@ -1810,10 +1887,9 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
         if (recipients.length === 0) {
           emailBroadcastResult.error = '目前尚無真實訂閱者信箱（請先在前台輸入您的真實信箱訂閱測試！）';
-        } else if (!store.emailSettings.resendApiKey) {
-          emailBroadcastResult.error = '尚未填入 Resend API Key，全站促銷已生效，但信件尚未寄出。';
+        } else if (!hasAnyEmailProvider(store)) {
+          emailBroadcastResult.error = '尚未設定寄信服務（Gmail 或 Resend），全站促銷已生效，但信件尚未寄出。';
         } else {
-          const fromHeader = `${store.emailSettings.fromName} <${store.emailSettings.fromEmail}>`;
           const subject = `⚡ 降價通知：${newPromo.title} (優惠碼 ${newPromo.code})`;
           const html = buildPromoEmailHtml(store, newPromo, body.customEmailMessage);
 
@@ -1821,9 +1897,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           let successCount = 0;
           let lastError = '';
           for (const recipientEmail of recipients) {
-            const resMail = await sendResendEmail({
-              apiKey: store.emailSettings.resendApiKey,
-              from: fromHeader,
+            const resMail = await sendUnifiedEmail(store, {
               to: [recipientEmail],
               subject,
               html,
@@ -1887,10 +1961,10 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
       const body = await readJsonBody(req);
 
-      if (!store.emailSettings.resendApiKey) {
+      if (!hasAnyEmailProvider(store)) {
         sendJson(res, 400, {
           ok: false,
-          error: '尚未設定 Resend API Key！請先切到「🔑 Resend 寄信設定」分頁填入 API Key。',
+          error: '尚未設定寄信帳號！請先切到「✉️ 寄信設定」填入 Gmail 與應用程式密碼（或 Resend Key）。',
         });
         return true;
       }
@@ -1914,7 +1988,6 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
-      const fromHeader = `${store.emailSettings.fromName} <${store.emailSettings.fromEmail}>`;
       let sentCount = 0;
       let lastError = '';
 
@@ -1933,9 +2006,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           activeCharId
         );
 
-        const resMail = await sendResendEmail({
-          apiKey: store.emailSettings.resendApiKey,
-          from: fromHeader,
+        const resMail = await sendUnifiedEmail(store, {
           to: [sub.email],
           subject,
           html,
@@ -2219,16 +2290,13 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
             }
           }
 
-          // 2. 若有真實 Email，且設定了 Resend Key，全自動 Email 寄送
-          if (sub.email && !sub.email.endsWith('@line.user') && store.emailSettings.resendApiKey) {
+          // 2. 若有真實 Email，且設定了 Gmail 或 Resend，全自動 Email 寄送
+          if (sub.email && !sub.email.endsWith('@line.user') && hasAnyEmailProvider(store)) {
             try {
-              const fromHeader = `${store.emailSettings.fromName} <${store.emailSettings.fromEmail}>`;
               const char = CHARACTERS_MAP[characterId] || CHARACTERS_MAP.minnie;
               const subject = `🎟️ ${char.shortName}通知開賣：東京迪士尼【${targetDate}】早鳥特惠已開放預訂！`;
               const html = buildTicketOpenEmailHtml(store, targetDate, parkName, undefined, characterId);
-              const resMail = await sendResendEmail({
-                apiKey: store.emailSettings.resendApiKey,
-                from: fromHeader,
+              const resMail = await sendUnifiedEmail(store, {
                 to: [sub.email],
                 subject,
                 html,
