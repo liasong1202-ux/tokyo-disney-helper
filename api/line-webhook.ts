@@ -167,10 +167,6 @@ export default async function handler(req: any, res: any) {
         const dateMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
         const targetDate = dateMatch ? dateMatch[1] : null;
 
-        // 提取樂園名稱
-        const parkMatch = text.match(/【(.*?)】/);
-        const parkName = parkMatch ? parkMatch[1] : '海外樂園';
-
         // 提取角色名稱
         let charKey = '米妮';
         for (const k of Object.keys(CHARACTER_REPLIES)) {
@@ -180,6 +176,14 @@ export default async function handler(req: any, res: any) {
           }
         }
         const charData = CHARACTER_REPLIES[charKey] || CHARACTER_REPLIES['米妮'];
+
+        // 提取樂園名稱
+        let parkName = '東京迪士尼';
+        if (text.includes('香港')) parkName = '香港迪士尼';
+        else if (text.includes('上海')) parkName = '上海迪士尼';
+        else if (text.includes('加州') || text.includes('美國')) parkName = '加州迪士尼';
+        else if (text.includes('海洋')) parkName = '東京迪士尼海洋';
+        else if (text.includes('陸地')) parkName = '東京迪士尼樂園';
 
         let saleOpenDate = '';
         if (targetDate && userId) {
@@ -196,14 +200,14 @@ export default async function handler(req: any, res: any) {
 
         console.log(`[LINE Webhook] 收到預約登記: User=${userId}, TargetDate=${targetDate}, SaleOpenDate=${saleOpenDate}, Character=${charKey}`);
 
-        // 自動回覆預約確認訊息
+        // 自動回覆預約確認訊息 (精簡俐落版)
         if (lineToken && replyToken) {
           try {
             let replyText = '';
             if (targetDate) {
-              replyText = `${charData.icon}【${charData.title} · 開賣預約已鎖定】\n\n${charData.greeting}\n\n📅 預約入園日：${targetDate}\n🏰 目標樂園：${parkName}\n⏰ 預計開賣日：${saleOpenDate || '入園前 2 個月同日'}\n\n🤖【全自動守護承諾】\n本系統已啟動雲端定時巡檢，開賣當天下午將由【${charKey}】全自動發送 LINE 推播提醒與早鳥特惠連結，您無需人工看顧，絕不漏單！\n\n👉 隨時查看最新日曆比價：\nhttps://tokyo-disney-helper.vercel.app/`;
+              replyText = `${charData.icon}【${charKey}開賣預約已登記】💖\n\n哈囉！${charKey}已經幫您記在小本本囉～\n📅 入園日期：${targetDate}\n🏰 目標樂園：${parkName}\n⏰ 預計開賣：${saleOpenDate || '入園前 2 個月'} 13:00\n\n開賣當天${charKey}會準時敲您發送早鳥特惠連結，不用擔心漏掉喔！🏰✨`;
             } else {
-              replyText = `${charData.icon}【${charData.title} · 收到您的訊息】\n\n${charData.greeting}\n\n隨時前往網站查看最新低價日曆與開賣倒數：\nhttps://tokyo-disney-helper.vercel.app/`;
+              replyText = `${charData.icon}【${charKey}收到您的訊息】\n\n哈囉！歡迎加入～隨時在網站查看最新即時低價日曆與開賣倒數唷！✨\nhttps://tokyo-disney-helper.vercel.app/`;
             }
 
             await fetch('https://api.line.me/v2/bot/message/reply', {

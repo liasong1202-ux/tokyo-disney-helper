@@ -1284,14 +1284,16 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       let pushText = '';
       if (characterId === 'minnie') {
-        pushText = `🎀【專屬守護大使 · 米妮即時開賣通知】\n\n哈囉！親愛的迪士尼粉絲～💖\n您預約的【${targetDate}】${parkName}門票【今日正式開賣】囉！🏰✨\n\n熱門檔期門票開賣首日最容易搶購一空，米妮提醒您趕快把握早鳥特惠與快速出憑證搶票：\n\n👉 KKday 官方授權門票直達（享專屬方案）：\n${kkdayUrl}\n\n👉 Klook 官方授權門票直達（可累積積分折現）：\n${klookUrl}\n\n祝您與摯愛親友度過最甜蜜浪漫的夢幻迪士尼之旅！🐭💕`;
+        pushText = `🎀【米妮提醒：門票今天開賣囉！】\n\n親愛的！您預約的【${targetDate}】${parkName}門票今日正式開賣囉！🏰✨\n熱門票跑很快，趕快去搶早鳥票吧～\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
       } else if (characterId === 'mickey') {
-        pushText = `🏰【歡樂隊長 · 米奇重要開賣提醒】\n\n嗨！好夥伴！🎉\n集結號角吹響！您鎖定的【${targetDate}】${parkName}門票【今日正式開放訂票】囉！\n\n夢幻魔法世界正在呼喚您，請儘速搶下熱門時段門票：\n\n👉 KKday 官方授權門票直達：\n${kkdayUrl}\n\n👉 Klook 官方授權門票直達：\n${klookUrl}\n\n出發！讓我們在灰姑娘城堡前相見！🐭✨`;
+        pushText = `🏰【米奇提醒：門票今天開賣囉！】\n\n嗨！好夥伴！您預約的【${targetDate}】${parkName}門票今天開賣囉！🎉\n熱門時段搶得快，快去搶票吧：\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
       } else if (characterId === 'donald') {
-        pushText = `⚓【衝鋒隊長 · 唐老鴨大聲提醒】\n\n呱呱呱！注意啦！⚡\n您預約的【${targetDate}】${parkName}門票【今天正式開搶】！\n\n別猶豫！熱門設施與人潮不等人，現在立刻下手搶票：\n\n👉 KKday 官方特惠直達：\n${kkdayUrl}\n\n👉 Klook 官方特惠直達：\n${klookUrl}\n\n搶到了記得跟我分享喜悅，呱呱！🦆`;
+        pushText = `⚓【唐老鴨提醒：門票今天開賣！】\n\n呱呱！您預約的【${targetDate}】${parkName}門票開搶啦！⚡\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
       } else {
-        pushText = `🍯【暖心大使 · 小熊維尼甜甜提醒】\n\n早安呀～吃過蜂蜜了嗎？🐻🍯\n維尼抱著甜蜜的心情告訴您：您預約的【${targetDate}】${parkName}門票【今天開賣囉】！\n\n慢慢挑選您喜歡的門票，祝您有一整天甜甜的冒險：\n\n👉 KKday 官方特惠直達：\n${kkdayUrl}\n\n👉 Klook 官方特惠直達：\n${klookUrl}\n\n記得拍好多美美的照片唷～🍯✨`;
+        pushText = `🍯【小熊維尼提醒：門票今天開賣囉！】\n\n早安呀！您預約的【${targetDate}】${parkName}門票今天開賣囉～🍯\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
       }
+
+      const cardImageUrl = 'https://tokyo-disney-helper.vercel.app/characters/vip_invitation_card.jpg';
 
       const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
@@ -1301,7 +1303,17 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         },
         body: JSON.stringify({
           to: lineUserId,
-          messages: [{ type: 'text', text: pushText }],
+          messages: [
+            {
+              type: 'image',
+              originalContentUrl: cardImageUrl,
+              previewImageUrl: cardImageUrl,
+            },
+            {
+              type: 'text',
+              text: pushText,
+            },
+          ],
         }),
       });
 
@@ -1360,7 +1372,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           // 1. 若有 LINE ID，全自動 LINE Push 推播
           if (sub.lineUserId && token) {
             try {
-              const pushText = `🎀【專屬守護大使 · 米妮自動提醒】\n\n哈囉！親愛的迪士尼粉絲～💖\n系統自動為您監測到：您預約的【${targetDate}】${parkName}門票【今日正式開賣】囉！🏰✨\n\n熱門檔期首日易售罄，米妮提醒您趕快把握早鳥方案：\n\n👉 KKday 官方授權門票：\n${kkdayUrl}\n\n👉 Klook 官方授權門票：\n${klookUrl}\n\n祝您旅途愉快！🐭💕`;
+              const cardImageUrl = 'https://tokyo-disney-helper.vercel.app/characters/vip_invitation_card.jpg';
+              const pushText = `🎀【米妮提醒：門票今天開賣囉！】\n\n親愛的！您預約的【${targetDate}】${parkName}門票今日正式開賣囉！🏰✨\n熱門票跑很快，趕快去搶早鳥票吧～\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
               const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
                 method: 'POST',
                 headers: {
@@ -1369,7 +1382,17 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
                 },
                 body: JSON.stringify({
                   to: sub.lineUserId,
-                  messages: [{ type: 'text', text: pushText }],
+                  messages: [
+                    {
+                      type: 'image',
+                      originalContentUrl: cardImageUrl,
+                      previewImageUrl: cardImageUrl,
+                    },
+                    {
+                      type: 'text',
+                      text: pushText,
+                    },
+                  ],
                 }),
               });
               if (resPush.ok) {
