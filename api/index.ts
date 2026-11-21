@@ -946,22 +946,6 @@ export function buildTicketOpenEmailHtml(
 </body>
 </html>`;
 }
-          🔵 前往 KKday 預訂 (${store.affiliateConfig.kkdayDefaultBonus}) →
-        </a>
-        <br/>
-        <a href="${store.affiliateConfig.officialUrl}" target="_blank" style="display:inline-block;color:#64748b;font-weight:600;font-size:12px;text-decoration:underline;margin-top:8px;">
-          亦可至東京迪士尼官網預訂 (日圓結帳需 1.5% 海外手續費)
-        </a>
-      </div>
-
-      <div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:20px;font-size:12px;color:#94a3b8;text-align:center;">
-        東京迪士尼門票降價與人潮預報助手 · 由 ${char.name} 為您傳送開賣通知
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
-}
 
 // 解析 Request JSON Body (支援 Node 原生串流、Express 與 Vercel Serverless pre-parsed body)
 async function readJsonBody(req: IncomingMessage): Promise<any> {
