@@ -707,6 +707,11 @@ function buildWelcomeEmailHtml(store: StoreData, subscriber: Subscriber): string
   const charId = subscriber.characterId || 'mickey';
   const char = CHARACTERS_MAP[charId] || CHARACTERS_MAP.mickey;
   const avatarSrc = getCharacterAvatarBase64(char.id);
+  const klookCode = (store.affiliateConfig.klookDefaultCode || '').trim();
+  const klookDesc = (store.affiliateConfig.klookDefaultDesc || '').trim();
+  const welcomePromoHtml = klookCode
+    ? `<div>🎁 <strong>Klook 常駐優惠碼：</strong><code style="color:#ea580c;font-weight:bold;">${klookCode}</code>${klookDesc ? ` (${klookDesc})` : ''}</div>`
+    : '';
 
   return `
 <!DOCTYPE html>
@@ -748,7 +753,7 @@ function buildWelcomeEmailHtml(store: StoreData, subscriber: Subscriber): string
       }
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:18px 0;">
         <div>📌 <strong>目前淡季最低票價：</strong>約 NT$ ${lowestTwd.toLocaleString()} (¥8,900)</div>
-        <div>🎁 <strong>Klook 常駐優惠碼：</strong><code style="color:#ea580c;font-weight:bold;">${store.affiliateConfig.klookDefaultCode}</code> (${store.affiliateConfig.klookDefaultDesc})</div>
+        ${welcomePromoHtml}
       </div>
       <div style="text-align:center;margin:24px 0;">
         <a href="${store.affiliateConfig.klookUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin:4px;">前往 Klook 查看目前可訂票日</a>
@@ -772,6 +777,11 @@ export function buildTicketOpenEmailHtml(
   const estTwd = Math.round(9400 * rate);
   const char = CHARACTERS_MAP[characterId || 'mickey'] || CHARACTERS_MAP.mickey;
   const avatarSrc = getCharacterAvatarBase64(char.id);
+  const klookCode = (store.affiliateConfig.klookDefaultCode || '').trim();
+  const klookDesc = (store.affiliateConfig.klookDefaultDesc || '').trim();
+  const klookPromoLineHtml = klookCode
+    ? `<div style="margin-top:8px;">🎁 <strong>Klook 結帳專屬折扣碼：</strong><code style="background:#ffffff;color:${char.themeColor};border:1px solid ${char.themeColor};font-weight:900;padding:3px 10px;border-radius:6px;font-size:14px;">${klookCode}</code>${klookDesc ? ` (${klookDesc})` : ''}</div>`
+    : '';
 
   return `
 <!DOCTYPE html>
@@ -836,7 +846,7 @@ export function buildTicketOpenEmailHtml(
       <div style="background:${char.cardBg};border:2px dashed ${char.themeColor};border-radius:16px;padding:18px;margin-bottom:24px;">
         <div style="font-size:15px;">📅 <strong>開放預訂入園日：</strong><span style="color:#0f172a;font-weight:900;font-size:17px;">${targetDate}</span> (${parkLabel})</div>
         <div style="margin-top:8px;">💰 <strong>今日匯率換算預估價：</strong>約 <strong style="color:${char.themeColor};font-size:20px;">NT$ ${estTwd.toLocaleString()}</strong> 起</div>
-        <div style="margin-top:8px;">🎁 <strong>Klook 結帳專屬折扣碼：</strong><code style="background:#ffffff;color:${char.themeColor};border:1px solid ${char.themeColor};font-weight:900;padding:3px 10px;border-radius:6px;font-size:14px;">${store.affiliateConfig.klookDefaultCode}</code> (${store.affiliateConfig.klookDefaultDesc})</div>
+        ${klookPromoLineHtml}
         <div style="margin-top:6px;font-size:12px;color:#64748b;">⚡ 提醒：東京迪士尼門票採入園前 60 天每日台灣時間 13:00 開賣，熱門週末門票極易額滿！</div>
       </div>
 
@@ -914,6 +924,326 @@ function sendJson(res: ServerResponse, status: number, payload: any) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(payload));
+}
+
+const CHARACTER_GRADIENTS: Record<string, { start: string; end: string }> = {
+  mickey: { start: '#dc2626', end: '#991b1b' },
+  minnie: { start: '#ec4899', end: '#be185d' },
+  donald: { start: '#0284c7', end: '#0369a1' },
+  duffy: { start: '#b45309', end: '#78350f' },
+  pooh: { start: '#f59e0b', end: '#b45309' },
+};
+
+function sanitizeHttpsUrl(raw: string | undefined, fallback: string): string {
+  const trimmed = (raw || '').trim();
+  if (trimmed.startsWith('https://')) return trimmed;
+  if (trimmed.startsWith('http://')) return `https://${trimmed.slice(7)}`;
+  return fallback;
+}
+
+export function buildLineTicketOpenFlexMessage(
+  store: StoreData,
+  characterId: string,
+  targetDate: string,
+  parkName: string,
+  kkdayUrl: string,
+  klookUrl: string,
+  officialUrl: string
+) {
+  const char = CHARACTERS_MAP[characterId] || CHARACTERS_MAP.minnie;
+  const grad = CHARACTER_GRADIENTS[char.id] || CHARACTER_GRADIENTS.minnie;
+  const rate = store.exchangeRateCache?.rate || 0.215;
+  const estTwd = Math.round(9400 * rate);
+  const safeTargetDate = (targetDate && targetDate.trim()) || '2027-01-04';
+  const safeParkName = (parkName && parkName.trim()) || '東京迪士尼樂園 / 海洋';
+  const avatarUrl = `https://tokyo-disney-helper.vercel.app/characters/${char.id}.png`;
+
+  const safeKkdayUrl = sanitizeHttpsUrl(
+    kkdayUrl,
+    'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper'
+  );
+  const safeKlookUrl = sanitizeHttpsUrl(
+    klookUrl,
+    'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/'
+  );
+  const safeOfficialUrl = sanitizeHttpsUrl(officialUrl, 'https://www.tokyodisneyresort.jp/tc/ticket/');
+
+  const klookCode = (store.affiliateConfig.klookDefaultCode || '').trim();
+  const klookDesc = (store.affiliateConfig.klookDefaultDesc || '').trim();
+
+  const infoContents: any[] = [
+    {
+      type: 'text',
+      text: `📅 開放預訂入園日：${safeTargetDate}`,
+      size: 'sm',
+      weight: 'bold',
+      color: '#0f172a',
+      wrap: true,
+    },
+    {
+      type: 'text',
+      text: `🏰 適用園區：${safeParkName}`,
+      size: 'xs',
+      color: '#334155',
+      wrap: true,
+    },
+    {
+      type: 'text',
+      text: `💰 今日匯率預估價：約 NT$ ${estTwd.toLocaleString()} 起`,
+      size: 'sm',
+      weight: 'bold',
+      color: char.themeColor,
+      wrap: true,
+    },
+  ];
+
+  if (klookCode) {
+    infoContents.push({
+      type: 'text',
+      text: `🎁 Klook 專屬折扣碼：${klookCode}${klookDesc ? ` (${klookDesc})` : ''}`,
+      size: 'xs',
+      weight: 'bold',
+      color: '#ea580c',
+      wrap: true,
+    });
+  }
+
+  infoContents.push({
+    type: 'text',
+    text: '⚡ 東京迪士尼採入園前 2 個月台灣時間 13:00 開賣，熱門週末極易額滿！',
+    size: 'xxs',
+    color: '#64748b',
+    wrap: true,
+    margin: 'xs',
+  });
+
+  return {
+    type: 'flex' as const,
+    altText: `${char.iconEmoji} ${char.shortName}通知：您預約的【${safeTargetDate}】門票正式開賣囉！恭喜可以買票嚕！`,
+    contents: {
+      type: 'bubble' as const,
+      size: 'mega' as const,
+      header: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        alignItems: 'center' as const,
+        paddingAll: '20px',
+        spacing: 'sm',
+        background: {
+          type: 'linearGradient' as const,
+          angle: '135deg',
+          startColor: grad.start,
+          endColor: grad.end,
+        },
+        contents: [
+          {
+            type: 'box' as const,
+            layout: 'vertical' as const,
+            width: '76px',
+            height: '76px',
+            cornerRadius: '38px',
+            backgroundColor: '#ffffff',
+            borderWidth: '3px',
+            borderColor: '#ffffff',
+            contents: [
+              {
+                type: 'image' as const,
+                url: avatarUrl,
+                size: 'full',
+                aspectRatio: '1:1',
+                aspectMode: 'cover' as const,
+              },
+            ],
+          },
+          {
+            type: 'box' as const,
+            layout: 'vertical' as const,
+            cornerRadius: '20px',
+            backgroundColor: '#ffffff',
+            paddingTop: '4px',
+            paddingBottom: '4px',
+            paddingStart: '14px',
+            paddingEnd: '14px',
+            contents: [
+              {
+                type: 'text' as const,
+                text: `🏰 ${char.name} · 開賣快訊`,
+                color: char.themeColor,
+                size: 'xs',
+                weight: 'bold',
+                align: 'center' as const,
+              },
+            ],
+          },
+          {
+            type: 'text' as const,
+            text: char.greeting,
+            size: 'xl',
+            weight: 'bold',
+            color: '#ffffff',
+            align: 'center' as const,
+            wrap: true,
+          },
+          {
+            type: 'text' as const,
+            text: `🎉 您預約的【${safeTargetDate}】門票正式開賣囉！`,
+            size: 'xs',
+            weight: 'bold',
+            color: '#fef08a',
+            align: 'center' as const,
+            wrap: true,
+          },
+        ],
+      },
+      body: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        paddingAll: '16px',
+        spacing: 'md',
+        backgroundColor: '#ffffff',
+        contents: [
+          {
+            type: 'box' as const,
+            layout: 'horizontal' as const,
+            backgroundColor: char.cardBg,
+            cornerRadius: '14px',
+            paddingAll: '12px',
+            spacing: 'md',
+            borderWidth: '1px',
+            borderColor: char.themeColor,
+            contents: [
+              {
+                type: 'box' as const,
+                layout: 'vertical' as const,
+                width: '56px',
+                flex: 0,
+                alignItems: 'center' as const,
+                spacing: 'xs',
+                contents: [
+                  {
+                    type: 'box' as const,
+                    layout: 'vertical' as const,
+                    width: '52px',
+                    height: '52px',
+                    cornerRadius: '12px',
+                    backgroundColor: '#ffffff',
+                    borderWidth: '2px',
+                    borderColor: char.themeColor,
+                    contents: [
+                      {
+                        type: 'image' as const,
+                        url: avatarUrl,
+                        size: 'full',
+                        aspectRatio: '1:1',
+                        aspectMode: 'fit' as const,
+                      },
+                    ],
+                  },
+                  {
+                    type: 'text' as const,
+                    text: char.shortName,
+                    size: 'xxs',
+                    weight: 'bold',
+                    color: char.themeColor,
+                    align: 'center' as const,
+                  },
+                ],
+              },
+              {
+                type: 'box' as const,
+                layout: 'vertical' as const,
+                flex: 1,
+                backgroundColor: '#ffffff',
+                cornerRadius: '12px',
+                paddingAll: '10px',
+                borderWidth: '1px',
+                borderColor: char.themeColor,
+                contents: [
+                  {
+                    type: 'text' as const,
+                    text: `【${char.title}】開賣廣播：`,
+                    size: 'xxs',
+                    weight: 'bold',
+                    color: char.themeColor,
+                    wrap: true,
+                  },
+                  {
+                    type: 'text' as const,
+                    text: `「${char.speech}」`,
+                    size: 'xs',
+                    color: '#1e293b',
+                    wrap: true,
+                    margin: 'xs',
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'box' as const,
+            layout: 'vertical' as const,
+            backgroundColor: char.cardBg,
+            cornerRadius: '14px',
+            paddingAll: '14px',
+            spacing: 'xs',
+            borderWidth: '1px',
+            borderColor: char.themeColor,
+            contents: infoContents,
+          },
+        ],
+      },
+      footer: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        spacing: 'sm',
+        paddingAll: '16px',
+        paddingTop: '0px',
+        contents: [
+          {
+            type: 'button' as const,
+            style: 'primary' as const,
+            color: char.themeColor,
+            height: 'sm' as const,
+            action: {
+              type: 'uri' as const,
+              label: `由${char.shortName}帶路：前往 KKday 預訂 →`,
+              uri: safeKkdayUrl,
+            },
+          },
+          {
+            type: 'button' as const,
+            style: 'primary' as const,
+            color: '#0284c7',
+            height: 'sm' as const,
+            action: {
+              type: 'uri' as const,
+              label: '前往 Klook 查看即時票價 →',
+              uri: safeKlookUrl,
+            },
+          },
+          {
+            type: 'button' as const,
+            style: 'link' as const,
+            color: '#64748b',
+            height: 'sm' as const,
+            action: {
+              type: 'uri' as const,
+              label: '亦可至東京迪士尼官網預訂 →',
+              uri: safeOfficialUrl,
+            },
+          },
+          {
+            type: 'text' as const,
+            text: `東京迪士尼門票助手 · 由 ${char.shortName} 傳送`,
+            size: 'xxs',
+            color: '#94a3b8',
+            align: 'center' as const,
+            margin: 'xs',
+          },
+        ],
+      },
+    },
+  };
 }
 
 export function buildLinePushText(
@@ -1568,10 +1898,18 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       if (!kkdayUrl.includes('cid=')) {
         kkdayUrl += `${kkdayUrl.includes('?') ? '&' : '?'}cid=${activeCid}&ud1=disney_helper`;
       }
-      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695';
+      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/';
+      const officialUrl = store.affiliateConfig.officialUrl || 'https://www.tokyodisneyresort.jp/tc/ticket/';
 
-      const pushText = buildLinePushText(characterId, targetDate, parkName, kkdayUrl, klookUrl);
-      const cardImageUrl = 'https://tokyo-disney-helper.vercel.app/characters/vip_invitation_card.jpg';
+      const flexMessage = buildLineTicketOpenFlexMessage(
+        store,
+        characterId,
+        targetDate,
+        parkName,
+        kkdayUrl,
+        klookUrl,
+        officialUrl
+      );
 
       const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
@@ -1581,17 +1919,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         },
         body: JSON.stringify({
           to: lineUserId,
-          messages: [
-            {
-              type: 'image',
-              originalContentUrl: cardImageUrl,
-              previewImageUrl: cardImageUrl,
-            },
-            {
-              type: 'text',
-              text: pushText,
-            },
-          ],
+          messages: [flexMessage],
         }),
       });
 
@@ -1660,7 +1988,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       if (!kkdayUrl.includes('cid=')) {
         kkdayUrl += `${kkdayUrl.includes('?') ? '&' : '?'}cid=${activeCid}&ud1=disney_helper`;
       }
-      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695';
+      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/';
+      const officialUrl = store.affiliateConfig.officialUrl || 'https://www.tokyodisneyresort.jp/tc/ticket/';
 
       for (const sub of store.subscribers) {
         const effectiveSaleOpenDate =
@@ -1679,14 +2008,21 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
               : '東京迪士尼';
           const characterId = sub.characterId || 'minnie';
 
-          // 1. 若有 LINE ID，全自動 LINE Push 推播 (使用專屬角色文案 + VIP 邀請卡)
+          // 1. 若有 LINE ID，全自動 LINE Push 推播 (使用 5 大角色 Flex 互動邀請卡)
           if (sub.lineUserId) {
             if (!token) {
               logs.push(`[LINE Skip] 尚未設定 LINE_CHANNEL_ACCESS_TOKEN，無法推播給 ${sub.lineUserId}`);
             } else {
               try {
-                const cardImageUrl = 'https://tokyo-disney-helper.vercel.app/characters/vip_invitation_card.jpg';
-                const pushText = buildLinePushText(characterId, targetDate, parkName, kkdayUrl, klookUrl);
+                const flexMessage = buildLineTicketOpenFlexMessage(
+                  store,
+                  characterId,
+                  targetDate,
+                  parkName,
+                  kkdayUrl,
+                  klookUrl,
+                  officialUrl
+                );
                 const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
                   method: 'POST',
                   headers: {
@@ -1695,17 +2031,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
                   },
                   body: JSON.stringify({
                     to: sub.lineUserId,
-                    messages: [
-                      {
-                        type: 'image',
-                        originalContentUrl: cardImageUrl,
-                        previewImageUrl: cardImageUrl,
-                      },
-                      {
-                        type: 'text',
-                        text: pushText,
-                      },
-                    ],
+                    messages: [flexMessage],
                   }),
                 });
                 if (resPush.ok) {
