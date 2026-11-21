@@ -1,0 +1,24 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "crons": [
+    {
+      "path": "/api/cron-check-ticket-open",
+      "schedule": "0 4 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/line-webhook",
+      "destination": "/api/line-webhook"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
