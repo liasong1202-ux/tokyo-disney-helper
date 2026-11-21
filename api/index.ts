@@ -1945,7 +1945,11 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       return true;
     }
     const body = await readJsonBody(req);
+    const beforeLen = store.subscribers.length;
     store.subscribers = store.subscribers.filter((s) => s.id !== body.id);
+    if (store.subscribers.length === beforeLen && body.email) {
+      store.subscribers = store.subscribers.filter((s) => s.email !== body.email);
+    }
     await saveStore(store);
     sendJson(res, 200, { ok: true, subscribers: store.subscribers });
     return true;

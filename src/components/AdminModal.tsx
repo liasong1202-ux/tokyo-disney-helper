@@ -738,20 +738,38 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     }
   };
 
-  // 刪除訂閱者
-  const handleDeleteSubscriber = async (id: string) => {
+  // 刪除訂閱者 (同步清除伺服器與 localStorage 備份，確保不會復活)
+  const handleDeleteSubscriber = async (sub: any) => {
+    const targetId = typeof sub === 'string' ? sub : sub.id;
+    const targetEmail = typeof sub === 'string' ? '' : (sub.email || '');
+
+    // 1. 立即從本地 React 狀態與 localStorage 移除
+    setSubscribers((prev) => prev.filter((s) => s.id !== targetId && (!targetEmail || s.email !== targetEmail)));
+    try {
+      const savedSubs = localStorage.getItem('tokyo_disney_subscribers');
+      if (savedSubs) {
+        const parsed = JSON.parse(savedSubs);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((s: any) => s.id !== targetId && (!targetEmail || s.email !== targetEmail));
+          localStorage.setItem('tokyo_disney_subscribers', JSON.stringify(filtered));
+        }
+      }
+    } catch {}
+
+    // 2. 通知後端從資料庫永久刪除
     const res = await fetch('/api/admin/subscribers/delete', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${adminToken}`,
       },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id: targetId, email: targetEmail }),
     });
     if (!res.ok) {
       showToast('error', '刪除失敗，請確認登入狀態');
       return;
     }
+    showToast('success', `🗑️ 已刪除訂閱者 ${targetEmail || targetId}`);
     fetchDashboard();
     onStateUpdated();
   };
@@ -1809,6 +1827,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                               </button>
                             ) : null}
                             <button
+                              type="button"
                               onClick={() => handleSendTicketOpenAlert(sub.id)}
                               disabled={loading}
                               className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg cursor-pointer"
@@ -1817,9 +1836,11 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                               📩 寄開賣通知
                             </button>
                             <button
-                              onClick={() => handleDeleteSubscriber(sub.id)}
-                              className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
-                              title="刪除此訂閱者"
+                              type="button"
+                              onClick={() => handleDeleteSubscriber(sub)}
+                              disabled={loading}
+                              className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded-lg cursor-pointer ml-1"
+                              title="刪除此訂閱者 (不會寄信)"
                             >
                               <Trash2 className="w-4 h-4 inline" />
                             </button>
