@@ -590,12 +590,21 @@ export default function App() {
       }),
     }).catch(() => {});
 
-    const targetUrl =
+    let targetUrl =
       platform === 'Klook'
         ? (selectedParkId === 'tokyo' ? affiliateConfig.klookUrl : currentPark.klookUrl)
         : platform === 'KKday'
         ? (selectedParkId === 'tokyo' ? affiliateConfig.kkdayUrl : currentPark.kkdayUrl)
         : (selectedParkId === 'tokyo' ? affiliateConfig.officialUrl : currentPark.officialUrl);
+
+    // 自動附加 KKday 專屬分潤追蹤碼 (CID 28178)，確保香港、上海、美國全樂園均能累積收益
+    if (platform === 'KKday') {
+      const cidMatch = (affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
+      const activeCid = cidMatch ? cidMatch[1] : '28178';
+      if (!targetUrl.includes('cid=')) {
+        targetUrl += `${targetUrl.includes('?') ? '&' : '?'}cid=${activeCid}&ud1=disney_helper`;
+      }
+    }
 
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
