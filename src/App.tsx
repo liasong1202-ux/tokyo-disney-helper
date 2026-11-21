@@ -363,7 +363,24 @@ export default function App() {
 
   useEffect(() => {
     fetchPublicState();
-  }, [fetchPublicState]);
+    try {
+      let vid = localStorage.getItem('disney_helper_vid');
+      if (!vid) {
+        vid = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+        localStorage.setItem('disney_helper_vid', vid);
+      }
+      const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      fetch('/api/track-visit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitorId: vid,
+          device: isMobile ? 'mobile' : 'desktop',
+          park: selectedParkId,
+        }),
+      }).catch(() => {});
+    } catch {}
+  }, [fetchPublicState, selectedParkId]);
 
   // 當月資料 (依當前年份、月份與選定樂園動態生成)
   const monthDays = useMemo(() => {

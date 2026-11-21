@@ -270,6 +270,23 @@ export interface LineSettings {
   channelAccessToken: string;
 }
 
+export interface TrafficStats {
+  todayDate: string; // 'YYYY-MM-DD'
+  todayPageviews: number;
+  todayVisitors: number;
+  totalPageviews: number;
+  totalVisitors: number;
+  mobileVisitors: number;
+  desktopVisitors: number;
+  todayVisitorIds?: string[];
+  recentVisits?: {
+    id: string;
+    timestamp: string;
+    park?: string;
+    device: 'mobile' | 'desktop';
+  }[];
+}
+
 export interface StoreData {
   subscribers: Subscriber[];
   clicks: ClickLog[];
@@ -282,6 +299,7 @@ export interface StoreData {
   activePromo: PromoConfig | null;
   emailSettings: EmailSettings;
   lineSettings: LineSettings;
+  traffic: TrafficStats;
   exchangeRateCache: {
     rate: number;
     updatedAt: string;
@@ -313,7 +331,7 @@ const DEFAULT_STORE: StoreData = {
     Official: 0,
   },
   affiliateConfig: {
-    klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/',
+    klookUrl: 'https://affiliate.klook.com/redirect?aid=144150&aff_adid=1585528&k_site=https%3A%2F%2Fwww.klook.com%2Fzh-TW%2Factivity%2F695-tokyo-disney-resort-1-day-pass-tokyo%2F',
     kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper',
     officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
     klookDefaultCode: '',
@@ -341,6 +359,17 @@ const DEFAULT_STORE: StoreData = {
   },
   lineSettings: {
     channelAccessToken: '',
+  },
+  traffic: {
+    todayDate: new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10),
+    todayPageviews: 0,
+    todayVisitors: 0,
+    totalPageviews: 0,
+    totalVisitors: 0,
+    mobileVisitors: 0,
+    desktopVisitors: 0,
+    todayVisitorIds: [],
+    recentVisits: [],
   },
   exchangeRateCache: {
     rate: 0.215,
@@ -376,6 +405,16 @@ function mergeWithDefaultStore(parsed: any): StoreData {
     },
     lineSettings: {
       channelAccessToken: safeParsed.lineSettings?.channelAccessToken || '',
+    },
+    traffic: {
+      ...DEFAULT_STORE.traffic,
+      ...(safeParsed.traffic || {}),
+      todayVisitorIds: Array.isArray(safeParsed.traffic?.todayVisitorIds)
+        ? safeParsed.traffic.todayVisitorIds
+        : [],
+      recentVisits: Array.isArray(safeParsed.traffic?.recentVisits)
+        ? safeParsed.traffic.recentVisits
+        : [],
     },
     exchangeRateCache: safeParsed.exchangeRateCache
       ? { ...DEFAULT_STORE.exchangeRateCache, ...safeParsed.exchangeRateCache }
@@ -607,8 +646,22 @@ async function sendResendEmail(params: {
 
 const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://tokyo-disney-helper.vercel.app').replace(/\/+$/, '');
 
+const DEFAULT_KLOOK_URL = 'https://affiliate.klook.com/redirect?aid=144150&aff_adid=1585528&k_site=https%3A%2F%2Fwww.klook.com%2Fzh-TW%2Factivity%2F695-tokyo-disney-resort-1-day-pass-tokyo%2F';
+const DEFAULT_KKDAY_URL = 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper';
+
+function ensureKlookAffiliateUrl(rawUrl?: string): string {
+  const fallback = DEFAULT_KLOOK_URL;
+  const url = (rawUrl || '').trim();
+  if (!url) return fallback;
+  if (url.includes('aid=')) return url;
+  if (/klook\.com/i.test(url)) {
+    return `${url}${url.includes('?') ? '&' : '?'}aid=144150`;
+  }
+  return url;
+}
+
 function ensureKkdayAffiliateUrl(rawUrl?: string): string {
-  const fallback = 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper';
+  const fallback = DEFAULT_KKDAY_URL;
   const url = (rawUrl || '').trim();
   if (!url) return fallback;
   if (!/kkday\.com/i.test(url)) return url;
@@ -624,7 +677,9 @@ function buildPromoEmailHtml(store: StoreData, promo: PromoConfig, customMessage
   const savedTwd = baseLowestTwd - promoLowestTwd;
 
   const targetUrl =
-    promo.platform === 'Klook' ? store.affiliateConfig.klookUrl : ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl);
+    promo.platform === 'Klook'
+      ? ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl)
+      : ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl);
 
   return `
 <!DOCTYPE html>
@@ -678,7 +733,7 @@ function buildPromoEmailHtml(store: StoreData, promo: PromoConfig, customMessage
       <div style="border-top:1px solid #e2e8f0;padding-top:18px;margin-top:24px;display:flex;justify-content:space-between;font-size:13px;color:#64748b;">
         <div>
           💡 其他比價通道：
-          <a href="${store.affiliateConfig.klookUrl}" style="color:#ea580c;font-weight:700;text-decoration: underline;margin-right:10px;">Klook 客路特惠</a>
+          <a href="${ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl)}" style="color:#ea580c;font-weight:700;text-decoration: underline;margin-right:10px;">Klook 客路特惠</a>
           <a href="${ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl)}" style="color:#0284c7;font-weight:700;text-decoration: underline;">KKday 送網卡方案</a>
         </div>
       </div>
@@ -755,7 +810,7 @@ function buildWelcomeEmailHtml(store: StoreData, subscriber: Subscriber): string
         ${welcomePromoHtml}
       </div>
       <div style="text-align:center;margin:24px 0;">
-        <a href="${store.affiliateConfig.klookUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin:4px;">前往 Klook 查看目前可訂票日</a>
+        <a href="${ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl)}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin:4px;">前往 Klook 查看目前可訂票日</a>
         <a href="${ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl)}" style="display:inline-block;background:#0284c7;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin:4px;">前往 KKday 查看送eSIM方案</a>
       </div>
     </div>
@@ -851,7 +906,7 @@ export function buildTicketOpenEmailHtml(
 
       <!-- 聯盟行銷訂票按鈕 (大按鈕，高轉化率，角色專屬主題色) -->
       <div style="text-align:center;margin:28px 0;">
-        <a href="${store.affiliateConfig.klookUrl}" target="_blank" style="display:inline-block;background:${char.buttonGradient};color:#ffffff;font-weight:900;font-size:16px;text-decoration:none;padding:16px 32px;border-radius:14px;margin:6px;box-shadow:0 6px 16px rgba(0,0,0,0.25);">
+        <a href="${ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl)}" target="_blank" style="display:inline-block;background:${char.buttonGradient};color:#ffffff;font-weight:900;font-size:16px;text-decoration:none;padding:16px 32px;border-radius:14px;margin:6px;box-shadow:0 6px 16px rgba(0,0,0,0.25);">
           🏰 由${char.shortName}帶路：立即前往 Klook 預訂 ${targetDate} 門票 →
         </a>
         <br/>
@@ -1313,7 +1368,11 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const rateInfo = await fetchLatestJpyRate(false);
     const store = await loadStore();
     sendJson(res, 200, {
-      affiliateConfig: store.affiliateConfig,
+      affiliateConfig: {
+        ...store.affiliateConfig,
+        klookUrl: ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl),
+        kkdayUrl: ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl),
+      },
       activePromo: store.activePromo,
       exchangeRate: rateInfo,
       subscriberCount: 12480 + store.subscribers.length,
@@ -1443,15 +1502,98 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       const targetUrl =
         platform === 'Klook'
-          ? store.affiliateConfig.klookUrl
+          ? ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl)
           : platform === 'KKday'
-          ? store.affiliateConfig.kkdayUrl
+          ? ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl)
           : store.affiliateConfig.officialUrl;
 
       sendJson(res, 200, { ok: true, targetUrl, clickCounts: store.clickCounts });
       return true;
     } catch (err: any) {
       sendJson(res, 500, { ok: false, error: err?.message });
+      return true;
+    }
+  }
+
+  // 4.0 訪客瀏覽與進站追蹤 (供站長後台即時統計「今日造訪人數」與「網頁瀏覽量」)
+  if (pathname === '/api/track-visit' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const store = await loadStore();
+      const now = new Date();
+      // 台灣時間 UTC+8
+      const twTime = new Date(now.getTime() + 8 * 3600 * 1000);
+      const todayStr = twTime.toISOString().slice(0, 10);
+
+      if (!store.traffic) {
+        store.traffic = {
+          todayDate: todayStr,
+          todayPageviews: 0,
+          todayVisitors: 0,
+          totalPageviews: 0,
+          totalVisitors: 0,
+          mobileVisitors: 0,
+          desktopVisitors: 0,
+          todayVisitorIds: [],
+          recentVisits: [],
+        };
+      }
+
+      // 若遇換日，自動重置今日計數
+      if (store.traffic.todayDate !== todayStr) {
+        store.traffic.todayDate = todayStr;
+        store.traffic.todayPageviews = 0;
+        store.traffic.todayVisitors = 0;
+        store.traffic.todayVisitorIds = [];
+      }
+
+      const visitorId = typeof body.visitorId === 'string' && body.visitorId ? body.visitorId : 'v_anon';
+      const device = body.device === 'desktop' ? 'desktop' : 'mobile';
+      const park = typeof body.park === 'string' ? body.park : 'tokyo';
+
+      store.traffic.todayPageviews = (store.traffic.todayPageviews || 0) + 1;
+      store.traffic.totalPageviews = (store.traffic.totalPageviews || 0) + 1;
+
+      if (!Array.isArray(store.traffic.todayVisitorIds)) {
+        store.traffic.todayVisitorIds = [];
+      }
+
+      if (!store.traffic.todayVisitorIds.includes(visitorId)) {
+        store.traffic.todayVisitors = (store.traffic.todayVisitors || 0) + 1;
+        store.traffic.totalVisitors = (store.traffic.totalVisitors || 0) + 1;
+        if (device === 'mobile') {
+          store.traffic.mobileVisitors = (store.traffic.mobileVisitors || 0) + 1;
+        } else {
+          store.traffic.desktopVisitors = (store.traffic.desktopVisitors || 0) + 1;
+        }
+        if (store.traffic.todayVisitorIds.length < 2000) {
+          store.traffic.todayVisitorIds.push(visitorId);
+        }
+      }
+
+      if (!Array.isArray(store.traffic.recentVisits)) {
+        store.traffic.recentVisits = [];
+      }
+      store.traffic.recentVisits.unshift({
+        id: Math.random().toString(36).slice(2, 9),
+        timestamp: now.toISOString(),
+        park,
+        device,
+      });
+      if (store.traffic.recentVisits.length > 30) {
+        store.traffic.recentVisits = store.traffic.recentVisits.slice(0, 30);
+      }
+
+      await saveStore(store);
+      sendJson(res, 200, {
+        ok: true,
+        todayVisitors: store.traffic.todayVisitors,
+        todayPageviews: store.traffic.todayPageviews,
+        totalVisitors: store.traffic.totalVisitors,
+      });
+      return true;
+    } catch {
+      sendJson(res, 200, { ok: true });
       return true;
     }
   }
@@ -1528,7 +1670,12 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       subscribers: store.subscribers,
       clickCounts: store.clickCounts,
       recentClicks: store.clicks.slice(0, 50),
-      affiliateConfig: store.affiliateConfig,
+      traffic: store.traffic,
+      affiliateConfig: {
+        ...store.affiliateConfig,
+        klookUrl: ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl),
+        kkdayUrl: ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl),
+      },
       activePromo: store.activePromo,
       emailSettings: {
         hasResendKey: Boolean(store.emailSettings.resendApiKey && store.emailSettings.resendApiKey.trim().length > 0),
@@ -1594,7 +1741,11 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
       const body = await readJsonBody(req);
       if (typeof body.resendApiKey === 'string') {
-        store.emailSettings.resendApiKey = body.resendApiKey.trim();
+        const trimmed = body.resendApiKey.trim();
+        // 防呆機制：若留空且目前已有金鑰，保留現有金鑰不洗掉
+        if (trimmed) {
+          store.emailSettings.resendApiKey = trimmed;
+        }
       }
       if (typeof body.fromEmail === 'string' && body.fromEmail.trim()) {
         store.emailSettings.fromEmail = body.fromEmail.trim();

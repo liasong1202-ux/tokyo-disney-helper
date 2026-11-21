@@ -29,6 +29,11 @@ interface AdminModalProps {
   onStateUpdated: () => void;
 }
 
+const DEFAULT_KLOOK_URL =
+  'https://affiliate.klook.com/redirect?aid=144150&aff_adid=1585528&k_site=https%3A%2F%2Fwww.klook.com%2Fzh-TW%2Factivity%2F695-tokyo-disney-resort-1-day-pass-tokyo%2F';
+const DEFAULT_KKDAY_URL =
+  'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper';
+
 export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminModalProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'promo' | 'affiliate' | 'subscribers' | 'resend'>('stats');
   const [loading, setLoading] = useState<boolean>(false);
@@ -68,13 +73,13 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     '官方授權憑證秒發，台幣結帳無匯差煩惱',
   ];
 
-  // 聯盟行銷表單
-  const [klookUrl, setKlookUrl] = useState('');
-  const [kkdayUrl, setKkdayUrl] = useState('');
-  const [officialUrl, setOfficialUrl] = useState('');
+  // 聯盟行銷表單 (全站鎖定專屬分潤碼，防空白覆蓋)
+  const [klookUrl, setKlookUrl] = useState(DEFAULT_KLOOK_URL);
+  const [kkdayUrl, setKkdayUrl] = useState(DEFAULT_KKDAY_URL);
+  const [officialUrl, setOfficialUrl] = useState('https://www.tokyodisneyresort.jp/tc/ticket/');
   const [klookDefaultCode, setKlookDefaultCode] = useState('');
   const [klookDefaultDesc, setKlookDefaultDesc] = useState('');
-  const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('');
+  const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('購票即享日本高速 eSIM 1GB 體驗組');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('https://lin.ee/XnkEyyl');
   const [gaMeasurementId, setGaMeasurementId] = useState('G-4X9B9D4VC8');
   const [klookFeatures, setKlookFeatures] = useState<string[]>(defaultKlookFeatures);
@@ -103,6 +108,26 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [selectedAdminChar, setSelectedAdminChar] = useState<string>('mickey');
   const [storageStatus, setStorageStatus] = useState<{ mode: string; connected: boolean; provider: string; error?: string } | null>(null);
   const [lineStatus, setLineStatus] = useState<{ hasToken: boolean; maskedToken?: string; botBasicId?: string; botName?: string } | null>(null);
+
+  // 📊 即時流量與造訪統計
+  const [trafficStats, setTrafficStats] = useState<{
+    todayDate?: string;
+    todayPageviews: number;
+    todayVisitors: number;
+    totalPageviews: number;
+    totalVisitors: number;
+    mobileVisitors: number;
+    desktopVisitors: number;
+    recentVisits?: { id: string; timestamp: string; park?: string; device: 'mobile' | 'desktop' }[];
+  }>({
+    todayPageviews: 0,
+    todayVisitors: 0,
+    totalPageviews: 0,
+    totalVisitors: 0,
+    mobileVisitors: 0,
+    desktopVisitors: 0,
+    recentVisits: [],
+  });
 
   // 🔒 站長身分安全鎖狀態 (Session 儲存)
   const [adminToken, setAdminToken] = useState<string>(() => {
@@ -270,12 +295,18 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
         setExchangeRateCache(data.exchangeRateCache || null);
 
         if (data.affiliateConfig) {
-          setKlookUrl(data.affiliateConfig.klookUrl || '');
-          setKkdayUrl(data.affiliateConfig.kkdayUrl || '');
-          setOfficialUrl(data.affiliateConfig.officialUrl || '');
+          const rawKlook = data.affiliateConfig.klookUrl || '';
+          setKlookUrl(
+            rawKlook && rawKlook.includes('aid=') ? rawKlook : DEFAULT_KLOOK_URL
+          );
+          const rawKkday = data.affiliateConfig.kkdayUrl || '';
+          setKkdayUrl(
+            rawKkday && rawKkday.includes('cid=') ? rawKkday : DEFAULT_KKDAY_URL
+          );
+          setOfficialUrl(data.affiliateConfig.officialUrl || 'https://www.tokyodisneyresort.jp/tc/ticket/');
           setKlookDefaultCode(data.affiliateConfig.klookDefaultCode || '');
           setKlookDefaultDesc(data.affiliateConfig.klookDefaultDesc || '');
-          setKkdayDefaultBonus(data.affiliateConfig.kkdayDefaultBonus || '');
+          setKkdayDefaultBonus(data.affiliateConfig.kkdayDefaultBonus || '購票即享日本高速 eSIM 1GB 體驗組');
           setLineOfficialUrl(data.affiliateConfig.lineOfficialUrl && data.affiliateConfig.lineOfficialUrl.trim() ? data.affiliateConfig.lineOfficialUrl.trim() : 'https://lin.ee/XnkEyyl');
           if (data.affiliateConfig.gaMeasurementId) {
             setGaMeasurementId(data.affiliateConfig.gaMeasurementId);
@@ -311,6 +342,9 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
         }
         if (data.lineSettings) {
           setLineStatus(data.lineSettings);
+        }
+        if (data.traffic) {
+          setTrafficStats(data.traffic);
         }
       }
 
@@ -877,6 +911,106 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           {/* TAB 1: 點擊與成效總覽 */}
           {activeTab === 'stats' && (
             <div className="space-y-6">
+              {/* 今日流量與全站訪客即時看板 */}
+              <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 rounded-2xl p-5 text-white shadow-xl space-y-4 border border-indigo-500/30">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <h3 className="text-base font-black tracking-wide flex items-center gap-2">
+                      <span>📊 全站即時流量與人潮看板</span>
+                      <span className="text-xs font-normal px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                        今日：{trafficStats.todayDate || new Date().toISOString().slice(0, 10)}
+                      </span>
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="https://analytics.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                    >
+                      <span>📈 開啟 GA4 深入報表 ↗</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* 4 個流量核心指標 */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3.5 border border-white/10">
+                    <div className="text-xs font-medium text-emerald-300 flex items-center justify-between">
+                      <span>👥 今日造訪人數 (UV)</span>
+                      <span className="text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded font-mono">即時</span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-white tabular-nums">
+                      {trafficStats.todayVisitors || 0} <span className="text-xs font-normal text-slate-300">人</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300 mt-1">今日不同訪客進站數</div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3.5 border border-white/10">
+                    <div className="text-xs font-medium text-sky-300 flex items-center justify-between">
+                      <span>👁️ 今日網頁瀏覽量 (PV)</span>
+                      <span className="text-[10px] bg-sky-500/30 text-sky-200 px-1.5 py-0.5 rounded font-mono">累計</span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-white tabular-nums">
+                      {trafficStats.todayPageviews || 0} <span className="text-xs font-normal text-slate-300">次</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300 mt-1">今日頁面總查閱次數</div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3.5 border border-white/10">
+                    <div className="text-xs font-medium text-purple-300">🌐 全站累積總訪客</div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-white tabular-nums">
+                      {trafficStats.totalVisitors || 0} <span className="text-xs font-normal text-slate-300">人</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300 mt-1">累積開頁 {trafficStats.totalPageviews || 0} 次</div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3.5 border border-white/10">
+                    <div className="text-xs font-medium text-amber-300">📱 訪客裝置分佈</div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-white tabular-nums">
+                      {trafficStats.todayVisitors
+                        ? Math.round(
+                            ((trafficStats.mobileVisitors || 0) /
+                              Math.max(1, (trafficStats.mobileVisitors || 0) + (trafficStats.desktopVisitors || 0))) *
+                              100
+                          )
+                        : 100}
+                      <span className="text-xs font-normal text-slate-300">% 手機</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300 mt-1">
+                      手機 {trafficStats.mobileVisitors || 0} · 電腦 {trafficStats.desktopVisitors || 0}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 最近訪客即時快訊 */}
+                {Array.isArray(trafficStats.recentVisits) && trafficStats.recentVisits.length > 0 && (
+                  <div className="pt-2 border-t border-white/10">
+                    <div className="text-[11px] font-bold text-slate-300 mb-2 flex items-center justify-between">
+                      <span>⚡ 最新即時進站紀錄 (最近 {Math.min(trafficStats.recentVisits.length, 5)} 筆)</span>
+                      <span className="text-[10px] text-slate-400">即時動態</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {trafficStats.recentVisits.slice(0, 5).map((v) => (
+                        <div
+                          key={v.id}
+                          className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs flex items-center gap-1.5"
+                        >
+                          <span>{v.device === 'mobile' ? '📱' : '💻'}</span>
+                          <span className="text-slate-200">
+                            {v.park === 'tokyo' ? '東京迪士尼' : v.park === 'hk' ? '香港迪士尼' : v.park === 'sh' ? '上海迪士尼' : v.park === 'us' ? '加州迪士尼' : '全站首頁'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(v.timestamp).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
                   <div className="text-xs font-bold text-orange-700">Klook 聯盟按鈕點擊</div>
@@ -1001,17 +1135,23 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    🟠 Klook 東京迪士尼門票「聯盟行銷專屬連結」
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>🟠 Klook 東京迪士尼門票「聯盟行銷專屬連結」</span>
+                    <span className="text-emerald-600 font-extrabold text-[11px]">
+                      {klookUrl.includes('aid=144150') ? '✅ 專屬分潤碼 (aid=144150) 已鎖定生效' : ''}
+                    </span>
                   </label>
                   <input
                     type="url"
                     required
                     value={klookUrl}
                     onChange={(e) => setKlookUrl(e.target.value)}
-                    placeholder="https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=您的代碼"
+                    placeholder="https://affiliate.klook.com/redirect?aid=144150&aff_adid=1585528&k_site=https%3A%2F%2Fwww.klook.com%2Fzh-TW%2Factivity%2F695-tokyo-disney-resort-1-day-pass-tokyo%2F"
                     className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
                   />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    💡 系統已自動幫您永久鎖定 <code>aid=144150&aff_adid=1585528</code>，所有訪客經由 Klook 購票都會計入您的專屬帳戶。
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1126,17 +1266,23 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                 <hr className="border-slate-200" />
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    🔵 KKday 東京迪士尼門票「聯盟行銷專屬連結」
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>🔵 KKday 東京迪士尼門票「聯盟行銷專屬連結」</span>
+                    <span className="text-emerald-600 font-extrabold text-[11px]">
+                      {kkdayUrl.includes('cid=28178') ? '✅ 專屬分潤碼 (cid=28178) 已鎖定生效' : ''}
+                    </span>
                   </label>
                   <input
                     type="url"
                     required
                     value={kkdayUrl}
                     onChange={(e) => setKkdayUrl(e.target.value)}
-                    placeholder="https://www.kkday.com/zh-tw/product/19252?cid=您的代碼"
+                    placeholder="https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper"
                     className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
                   />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    💡 系統已自動幫您永久鎖定 <code>cid=28178&ud1=disney_helper</code>，所有訪客經由 KKday 購票都會計入您的帳戶。
+                  </p>
                 </div>
 
                 <div>
