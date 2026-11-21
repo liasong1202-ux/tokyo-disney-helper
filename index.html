@@ -5,24 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>海外樂園門票情報 - 日本東京・香港・上海・加州迪士尼即時比價與人潮預報</title>
     <meta name="description" content="2026-2027 最新海外樂園門票情報站！支援東京、香港、上海、加州迪士尼即時低價日曆、提前2個月開賣通知、LINE/Email專屬推播、Klook/KKday折扣碼比價與即時人潮避坑預報。" />
-    <meta name="keywords" content="海外樂園門票情報,東京迪士尼門票,香港迪士尼門票,上海迪士尼門票,加州迪士尼門票,迪士尼人潮預報,迪士尼低價日曆,東京迪士尼開賣時間,Klook折扣碼,KKday優惠" />
-    <meta name="author" content="東京迪士尼門票情報助手" />
+    <meta name="keywords" content="海外樂園門票情報,東京迪士尼門票,東京迪士尼開賣時間,迪士尼人潮預報,迪士尼低價日曆,香港迪士尼門票,上海迪士尼門票,加州迪士尼門票,Klook折扣碼,KKday優惠,東京迪士尼門票預約" />
+    <meta name="author" content="海外樂園門票情報" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://tokyo-disney-helper.vercel.app/" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
 
-    <!-- Open Graph for Social & AI crawlers -->
-    <meta property="og:title" content="東京迪士尼門票降價與人潮預報助手 - 台幣即時低價日曆・角色圖文開賣通知" />
-    <meta property="og:description" content="東京迪士尼哪天最便宜、哪天人最少？台幣低價日曆一目了然，未開賣日期支援 5 大迪士尼角色 Email 開賣第一秒圖文通知！" />
+    <!-- Google tag (gtag.js) - Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4X9B9D4VC8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-4X9B9D4VC8', { send_page_view: true });
+    </script>
+
+    <!-- Open Graph for Social & AI crawlers (Facebook, LINE, Threads, X) -->
+    <meta property="og:title" content="海外樂園門票情報 - 日本東京・香港・上海・加州迪士尼即時比價與開賣通知" />
+    <meta property="og:description" content="東京迪士尼哪天最便宜、哪天人最少？台幣低價日曆一目了然，未開賣日期支援 5 大迪士尼角色 LINE 互動卡片與 Email 開賣第一秒通知！" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="zh_TW" />
     <meta property="og:url" content="https://tokyo-disney-helper.vercel.app/" />
-    <meta property="og:image" content="https://tokyo-disney-helper.vercel.app/og-image.svg" />
+    <meta property="og:image" content="https://tokyo-disney-helper.vercel.app/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="東京迪士尼門票降價與人潮預報助手" />
-    <meta name="twitter:description" content="台幣低價日曆、人潮指數預測、5大迪士尼角色開賣第一秒通知與三大平台即時比價。" />
-    <meta name="twitter:image" content="https://tokyo-disney-helper.vercel.app/og-image.svg" />
+    <meta name="twitter:title" content="海外樂園門票情報 - 日本東京・香港・上海・加州迪士尼即時比價" />
+    <meta name="twitter:description" content="台幣即時低價日曆、人潮指數預測、5大迪士尼角色開賣第一秒通知與各大平台即時比價。" />
+    <meta name="twitter:image" content="https://tokyo-disney-helper.vercel.app/og-image.jpg" />
 
     <!-- GEO / AI Engine Optimization (Schema.org 結構化資料) -->
     <!-- 讓 ChatGPT, Perplexity, Google Gemini, Copilot 引用推薦 -->
@@ -129,7 +140,7 @@
               "name": "什麼是「開賣第一秒通知」？可以挑選哪 5 位迪士尼角色來通知我？",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "當您關注的未來日期尚未開放購票時，只要留下 Email 並挑選守護角色（米奇、米妮、唐老鴨、達菲熊或小熊維尼），在入園前 60 天開賣當天，專屬角色就會以「恭喜可以買票嚕！」的精美圖文信件第一秒通知您搶票！"
+                "text": "當您關注的未來日期尚未開放購票時，只要加入 LINE 官方帳號或留下 Email 並挑選專屬守護角色（米奇、米妮、唐老鴨、達菲熊或小熊維尼），在入園前 2 個月開賣當天台灣時間 13:00 前，專屬角色就會以「恭喜可以買票嚕！」的 LINE 互動邀請卡與圖文信件第一秒通知您搶票！"
               }
             }
           ]
@@ -143,6 +154,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <!-- 搜尋引擎與無 JavaScript 爬蟲友善結構化內容 -->
+    <noscript>
+      <header style="padding: 24px; text-align: center; background: #1e1b4b; color: white;">
+        <h1>海外樂園門票情報 - 日本東京・香港・上海・加州迪士尼即時比價與人潮預報</h1>
+        <p>提供東京迪士尼、香港迪士尼、上海迪士尼、加州迪士尼浮動票價自動換算台幣、人潮預測指數、入園前2個月開賣即時通知與各大通路比價工具。</p>
+      </header>
+      <main style="padding: 24px; max-width: 800px; margin: 0 auto; line-height: 1.8;">
+        <h2>東京迪士尼門票重點攻略</h2>
+        <ul>
+          <li><strong>官方開賣時間：</strong>入園日前 2 個月每日台灣時間 13:00（日本時間 14:00）準時開放預訂。</li>
+          <li><strong>票價與匯率：</strong>浮動票價 ¥8,900 ～ ¥10,900，即時換算約新台幣 NT$ 1,910 ～ NT$ 2,350 起。</li>
+          <li><strong>比價與優惠：</strong>支援 Klook、KKday 與官方通路即時比價，免去 1.5% 海外交易手續費。</li>
+          <li><strong>5 大守護角色通知：</strong>支援米奇、米妮、唐老鴨、達菲熊、小熊維尼專屬 LINE 互動卡片與 Email 開賣第一秒通知。</li>
+        </ul>
+      </main>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

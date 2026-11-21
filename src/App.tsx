@@ -244,6 +244,15 @@ export default function App() {
   const [copiedLineId, setCopiedLineId] = useState<boolean>(false);
   const [copiedLineMsg, setCopiedLineMsg] = useState<boolean>(false);
 
+  // Google Analytics 4 自訂事件追蹤 (無侵入式、非同步)
+  const trackGaEvent = (eventName: string, params?: Record<string, any>) => {
+    try {
+      if (typeof window !== 'undefined' && (window as any).gtag) {
+        (window as any).gtag('event', eventName, params);
+      }
+    } catch {}
+  };
+
   // 跨平台智慧 LINE 加好友彈窗與自動帶入預約訊息
   const handleOpenLineModal = (dateTarget?: string, charName?: string) => {
     const currentChar = getCharacterById(selectedCharacterId);
@@ -252,6 +261,12 @@ export default function App() {
     const defaultMsg = dateTarget 
       ? `您好！我想預約 ${dateTarget} 開賣通知${charPart}與早鳥特惠 🏰✨`
       : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與早鳥特惠 🏰✨`;
+
+    trackGaEvent('line_alert_click', {
+      park: selectedParkId,
+      target_date: dateTarget || 'general',
+      character: finalChar,
+    });
     
     // 自動複製預約訊息至剪貼簿 (作為防呆備援)
     try {
@@ -479,6 +494,11 @@ export default function App() {
     setSubmittingSub(true);
     setReservedOpenDateInfo(null);
     try {
+      trackGaEvent('email_subscribe', {
+        alert_type: subAlertType,
+        park: subTargetPark,
+        character: selectedCharacterId,
+      });
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -522,6 +542,11 @@ export default function App() {
       saleOpenDate: currentDayData.saleOpenDate,
     });
     try {
+      trackGaEvent('ticket_open_alert_subscribe', {
+        target_date: currentDayData.date,
+        park: selectedPark,
+        character: selectedCharacterId,
+      });
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -556,6 +581,14 @@ export default function App() {
     const priceTwd = currentDayData
       ? calculatePrice(currentDayData.basePriceJpy[ticketType]).finalTwd
       : 1900;
+
+    trackGaEvent('affiliate_click', {
+      platform,
+      park: selectedParkId,
+      ticket_type: ticketType,
+      date: selectedDateStr,
+      price_twd: priceTwd,
+    });
 
     // 1. 本地持久化記錄（零延遲雙重保險）
     try {

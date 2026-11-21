@@ -76,6 +76,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [klookDefaultDesc, setKlookDefaultDesc] = useState('');
   const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('https://lin.ee/XnkEyyl');
+  const [gaMeasurementId, setGaMeasurementId] = useState('G-4X9B9D4VC8');
   const [klookFeatures, setKlookFeatures] = useState<string[]>(defaultKlookFeatures);
   const [newKlookFeature, setNewKlookFeature] = useState<string>('');
   const [kkdayFeatures, setKkdayFeatures] = useState<string[]>(defaultKkdayFeatures);
@@ -276,6 +277,9 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           setKlookDefaultDesc(data.affiliateConfig.klookDefaultDesc || '');
           setKkdayDefaultBonus(data.affiliateConfig.kkdayDefaultBonus || '');
           setLineOfficialUrl(data.affiliateConfig.lineOfficialUrl && data.affiliateConfig.lineOfficialUrl.trim() ? data.affiliateConfig.lineOfficialUrl.trim() : 'https://lin.ee/XnkEyyl');
+          if (data.affiliateConfig.gaMeasurementId) {
+            setGaMeasurementId(data.affiliateConfig.gaMeasurementId);
+          }
           if (Array.isArray(data.affiliateConfig.klookFeatures) && data.affiliateConfig.klookFeatures.length > 0) {
             setKlookFeatures(data.affiliateConfig.klookFeatures);
           }
@@ -472,6 +476,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
       klookDefaultDesc,
       kkdayDefaultBonus,
       lineOfficialUrl,
+      gaMeasurementId: gaMeasurementId.trim(),
       klookFeatures,
       kkdayFeatures,
     };
@@ -846,6 +851,24 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                 </span>
               </div>
             )}
+            <div
+              className={`px-3 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 ${
+                gaMeasurementId
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-slate-50 text-slate-600 border-slate-200'
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  gaMeasurementId ? 'bg-emerald-500' : 'bg-slate-400'
+                }`}
+              ></span>
+              <span>
+                {gaMeasurementId
+                  ? `📈 GA4 流量分析：已連線 (${gaMeasurementId})`
+                  : '📈 GA4 流量分析：尚未設定'}
+              </span>
+            </div>
           </div>
         )}
 
@@ -1228,6 +1251,32 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
                     💡 使用者點擊「加 LINE 接收開賣/降價通知」即會自動打開 LINE 加好友。開賣時您可直接用手機 LINE 官方帳號後台發送推播！
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200">
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span className="text-amber-700 font-extrabold flex items-center gap-1.5">
+                      <span>📈 Google Analytics 4 (GA4) 評估 ID (評估訪客流量與來源)</span>
+                    </span>
+                    <a
+                      href="https://analytics.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-indigo-600 hover:underline"
+                    >
+                      開啟 GA4 控制台 ↗
+                    </a>
+                  </label>
+                  <input
+                    type="text"
+                    value={gaMeasurementId}
+                    onChange={(e) => setGaMeasurementId(e.target.value.trim())}
+                    placeholder="G-XXXXXXXXXX"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    💡 填入您的 Google Analytics 4 評估 ID（例如 <code>G-4X9B9D4VC8</code>），即可即時追蹤全站訪客瀏覽量、LINE 點擊率與票券導購轉換。
                   </p>
                 </div>
               </div>

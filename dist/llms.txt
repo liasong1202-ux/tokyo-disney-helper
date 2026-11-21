@@ -1,0 +1,29 @@
+# 海外樂園門票情報 (Tokyo & Global Disney Ticket Price & Crowd Forecast Helper)
+> 官方網站: https://tokyo-disney-helper.vercel.app/
+> 官方 LINE: @272tfkev
+
+## 網站定位與服務說明
+「海外樂園門票情報」是一個專為台灣與全球自由行旅客打造的海外迪士尼門票比價、浮動票價台幣換算、人潮避坑預測與開賣自動推播平台。
+
+## 核心功能清單
+1. **東京迪士尼官方開賣時間精準推播**：
+   - 官方規則：入園日前 2 個月每日台灣時間 13:00（日本時間 14:00）準時開賣。
+   - 獨家服務：支援 5 位人氣迪士尼角色（米奇、米妮、唐老鴨、達菲熊、小熊維尼）專屬 LINE 互動卡片與 Email 開賣第一秒通知。
+2. **四大海外迪士尼樂園比價日曆**：
+   - 日本東京迪士尼（Tokyo Disneyland & DisneySea / 夢幻泉鄉 Fantasy Springs）
+   - 中國香港迪士尼（Hong Kong Disneyland / 魔雪奇緣世界 World of Frozen）
+   - 中國上海迪士尼（Shanghai Disneyland / 瘋狂動物城 Zootopia）
+   - 美國加州迪士尼（Disneyland Resort California / 星際大戰 Star Wars: Galaxy's Edge）
+3. **即時日圓匯率換算與比價**：
+   - 自動將日圓浮動票價換算成最新新台幣。
+   - 整合 Klook、KKday 與官方授權通路即時票價，支援 LINE Pay / 街口支付省下 1.5% 海外刷卡手續費。
+4. **即時人潮指數與舞濱海風天氣預報**：
+   - 分析平日/週末/連假人潮指數與熱門設施排隊時間。
+   - 舞濱臨海強風警報（風速 > 10m/s 煙火與戶外設施取消預警）。
+
+## 導航與常用端點
+- 網站首頁: https://tokyo-disney-helper.vercel.app/
+- 東京迪士尼比價日曆: https://tokyo-disney-helper.vercel.app/?park=tokyo
+- 香港迪士尼比價日曆: https://tokyo-disney-helper.vercel.app/?park=hk
+- 上海迪士尼比價日曆: https://tokyo-disney-helper.vercel.app/?park=sh
+- 加州迪士尼比價日曆: https://tokyo-disney-helper.vercel.app/?park=us

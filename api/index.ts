@@ -254,6 +254,7 @@ export interface AffiliateConfig {
   klookDefaultDesc: string;
   kkdayDefaultBonus: string;
   lineOfficialUrl?: string; // LINE 官方帳號加好友連結 e.g. https://line.me/R/ti/p/@your_line_id
+  gaMeasurementId?: string; // Google Analytics 4 測量 ID (G-XXXXXXXXXX)
   klookFeatures?: string[];
   kkdayFeatures?: string[];
 }
@@ -313,12 +314,13 @@ const DEFAULT_STORE: StoreData = {
   },
   affiliateConfig: {
     klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/',
-    kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan',
+    kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper',
     officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
     klookDefaultCode: '',
     klookDefaultDesc: '',
     kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
     lineOfficialUrl: 'https://lin.ee/XnkEyyl',
+    gaMeasurementId: process.env.VITE_GA_MEASUREMENT_ID || process.env.GA_MEASUREMENT_ID || 'G-4X9B9D4VC8',
     klookFeatures: [
       '累積 Klook 旅遊積分，下次行程預訂可直接折抵現金',
       '支援 LINE Pay / 街口支付，省去 1.5% 海外刷卡手續費',
@@ -603,6 +605,17 @@ async function sendResendEmail(params: {
   }
 }
 
+const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://tokyo-disney-helper.vercel.app').replace(/\/+$/, '');
+
+function ensureKkdayAffiliateUrl(rawUrl?: string): string {
+  const fallback = 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper';
+  const url = (rawUrl || '').trim();
+  if (!url) return fallback;
+  if (!/kkday\.com/i.test(url)) return url;
+  if (url.includes('cid=')) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}cid=28178&ud1=disney_helper`;
+}
+
 // 產生精美的降價促銷 Email HTML 模板 (內嵌聯盟行銷按鈕)
 function buildPromoEmailHtml(store: StoreData, promo: PromoConfig, customMessage?: string): string {
   const rate = store.exchangeRateCache.rate || 0.215;
@@ -611,7 +624,7 @@ function buildPromoEmailHtml(store: StoreData, promo: PromoConfig, customMessage
   const savedTwd = baseLowestTwd - promoLowestTwd;
 
   const targetUrl =
-    promo.platform === 'Klook' ? store.affiliateConfig.klookUrl : store.affiliateConfig.kkdayUrl;
+    promo.platform === 'Klook' ? store.affiliateConfig.klookUrl : ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl);
 
   return `
 <!DOCTYPE html>
@@ -666,7 +679,7 @@ function buildPromoEmailHtml(store: StoreData, promo: PromoConfig, customMessage
         <div>
           💡 其他比價通道：
           <a href="${store.affiliateConfig.klookUrl}" style="color:#ea580c;font-weight:700;text-decoration: underline;margin-right:10px;">Klook 客路特惠</a>
-          <a href="${store.affiliateConfig.kkdayUrl}" style="color:#0284c7;font-weight:700;text-decoration: underline;">KKday 送網卡方案</a>
+          <a href="${ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl)}" style="color:#0284c7;font-weight:700;text-decoration: underline;">KKday 送網卡方案</a>
         </div>
       </div>
     </div>
@@ -679,24 +692,10 @@ function buildPromoEmailHtml(store: StoreData, promo: PromoConfig, customMessage
 </html>`;
 }
 
-// 讀取角色高畫質 PNG (優先) 或向量 SVG 並轉為 Data URI，確保在 Email 與預覽視窗均能 100% 呈現真實角色立繪
-function getCharacterAvatarBase64(charId: string): string {
-  try {
-    const pngPath = path.resolve(__dirname, '../public/characters', `${charId}.png`);
-    if (fs.existsSync(pngPath)) {
-      const buffer = fs.readFileSync(pngPath);
-      return `data:image/png;base64,${buffer.toString('base64')}`;
-    }
-    const svgPath = path.resolve(__dirname, '../public/characters', `${charId}.svg`);
-    if (fs.existsSync(svgPath)) {
-      const content = fs.readFileSync(svgPath, 'utf-8');
-      const base64 = Buffer.from(content).toString('base64');
-      return `data:image/svg+xml;base64,${base64}`;
-    }
-  } catch (err) {
-    console.error('Failed to load character image:', err);
-  }
-  return `/characters/${charId}.png`;
+// 取得角色絕對圖片網址，確保在 Gmail、Outlook 等所有信箱與預覽視窗均能 100% 呈現真實角色立繪（不破圖、不依賴 base64）
+function getCharacterAvatarUrl(charId: string): string {
+  const safeId = CHARACTERS_MAP[charId]?.id || 'mickey';
+  return `${PUBLIC_SITE_URL}/characters/${safeId}.png`;
 }
 
 // 產生歡迎訂閱確認信 HTML (支援降價特惠通知 + 尚未開賣日期的「開放訂票提醒」)
@@ -706,7 +705,7 @@ function buildWelcomeEmailHtml(store: StoreData, subscriber: Subscriber): string
   const isTicketOpenAlert = subscriber.alertType === 'ticket_open' || Boolean(subscriber.targetDate);
   const charId = subscriber.characterId || 'mickey';
   const char = CHARACTERS_MAP[charId] || CHARACTERS_MAP.mickey;
-  const avatarSrc = getCharacterAvatarBase64(char.id);
+  const avatarSrc = getCharacterAvatarUrl(char.id);
   const klookCode = (store.affiliateConfig.klookDefaultCode || '').trim();
   const klookDesc = (store.affiliateConfig.klookDefaultDesc || '').trim();
   const welcomePromoHtml = klookCode
@@ -731,7 +730,7 @@ function buildWelcomeEmailHtml(store: StoreData, subscriber: Subscriber): string
       <!-- 專屬守護角色資訊 (真圖呈現) -->
       <div style="background:#f8fafc;border:2px solid ${char.themeColor};border-radius:16px;padding:14px;margin:16px 0;display:flex;align-items:center;">
         <div style="width:52px;height:52px;border-radius:50%;overflow:hidden;border:2px solid ${char.themeColor};box-shadow:0 3px 8px rgba(0,0,0,0.12);background:#ffffff;margin-right:14px;flex-shrink:0;">
-          <img src="${avatarSrc}" alt="${char.name}" style="width:100%;height:100%;display:block;object-fit:cover;" />
+          <img src="${avatarSrc}" alt="${char.name}" width="52" height="52" style="width:52px;height:52px;display:block;object-fit:cover;border-radius:50%;" />
         </div>
         <div>
           <div style="font-size:12px;color:#64748b;">您的專屬開賣守護角色</div>
@@ -757,7 +756,7 @@ function buildWelcomeEmailHtml(store: StoreData, subscriber: Subscriber): string
       </div>
       <div style="text-align:center;margin:24px 0;">
         <a href="${store.affiliateConfig.klookUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin:4px;">前往 Klook 查看目前可訂票日</a>
-        <a href="${store.affiliateConfig.kkdayUrl}" style="display:inline-block;background:#0284c7;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin:4px;">前往 KKday 查看送eSIM方案</a>
+        <a href="${ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl)}" style="display:inline-block;background:#0284c7;color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin:4px;">前往 KKday 查看送eSIM方案</a>
       </div>
     </div>
   </div>
@@ -776,7 +775,7 @@ export function buildTicketOpenEmailHtml(
   const rate = store.exchangeRateCache.rate || 0.215;
   const estTwd = Math.round(9400 * rate);
   const char = CHARACTERS_MAP[characterId || 'mickey'] || CHARACTERS_MAP.mickey;
-  const avatarSrc = getCharacterAvatarBase64(char.id);
+  const avatarSrc = getCharacterAvatarUrl(char.id);
   const klookCode = (store.affiliateConfig.klookDefaultCode || '').trim();
   const klookDesc = (store.affiliateConfig.klookDefaultDesc || '').trim();
   const klookPromoLineHtml = klookCode
@@ -797,7 +796,7 @@ export function buildTicketOpenEmailHtml(
     <div style="background:${char.bgGradient};padding:32px 24px;text-align:center;color:#ffffff;position:relative;">
       <!-- 角色大頭貼圖案 -->
       <div style="width:84px;height:84px;border-radius:50%;overflow:hidden;border:4px solid #ffffff;box-shadow:0 6px 16px rgba(0,0,0,0.3);margin:0 auto 12px;background:#ffffff;">
-        <img src="${avatarSrc}" alt="${char.name}" style="width:100%;height:100%;display:block;object-fit:cover;" />
+        <img src="${avatarSrc}" alt="${char.name}" width="84" height="84" style="width:84px;height:84px;display:block;object-fit:cover;border-radius:50%;" />
       </div>
 
       <div style="display:inline-block;background:#ffffff;color:${char.themeColor};font-weight:900;font-size:13px;padding:5px 16px;border-radius:999px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
@@ -819,7 +818,7 @@ export function buildTicketOpenEmailHtml(
         <tr>
           <td style="width:84px;vertical-align:top;text-align:center;">
             <div style="width:76px;height:76px;border-radius:18px;overflow:hidden;border:3px solid ${char.themeColor};box-shadow:0 4px 12px rgba(0,0,0,0.15);background:#ffffff;margin:0 auto;display:flex;align-items:center;justify-content:center;">
-              <img src="${avatarSrc}" alt="${char.name}" style="width:100%;height:100%;display:block;object-fit:contain;" />
+              <img src="${avatarSrc}" alt="${char.name}" width="76" height="76" style="width:76px;height:76px;display:block;object-fit:contain;" />
             </div>
             <div style="font-size:13px;font-weight:900;color:${char.themeColor};margin-top:6px;">${char.shortName}</div>
           </td>
@@ -847,7 +846,7 @@ export function buildTicketOpenEmailHtml(
         <div style="font-size:15px;">📅 <strong>開放預訂入園日：</strong><span style="color:#0f172a;font-weight:900;font-size:17px;">${targetDate}</span> (${parkLabel})</div>
         <div style="margin-top:8px;">💰 <strong>今日匯率換算預估價：</strong>約 <strong style="color:${char.themeColor};font-size:20px;">NT$ ${estTwd.toLocaleString()}</strong> 起</div>
         ${klookPromoLineHtml}
-        <div style="margin-top:6px;font-size:12px;color:#64748b;">⚡ 提醒：東京迪士尼門票採入園前 60 天每日台灣時間 13:00 開賣，熱門週末門票極易額滿！</div>
+        <div style="margin-top:6px;font-size:12px;color:#64748b;">⚡ 提醒：東京迪士尼門票採入園前 2 個月每日台灣時間 13:00 開賣，熱門週末門票極易額滿！</div>
       </div>
 
       <!-- 聯盟行銷訂票按鈕 (大按鈕，高轉化率，角色專屬主題色) -->
@@ -856,7 +855,23 @@ export function buildTicketOpenEmailHtml(
           🏰 由${char.shortName}帶路：立即前往 Klook 預訂 ${targetDate} 門票 →
         </a>
         <br/>
-        <a href="${store.affiliateConfig.kkdayUrl}" target="_blank" style="display:inline-block;background:#0284c7;color:#ffffff;font-weight:800;font-size:14px;text-decoration:none;padding:13px 26px;border-radius:12px;margin:6px;box-shadow:0 4px 12px rgba(2,132,199,0.3);">
+        <a href="${ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl)}" target="_blank" style="display:inline-block;background:#0284c7;color:#ffffff;font-weight:800;font-size:14px;text-decoration:none;padding:13px 26px;border-radius:12px;margin:6px;box-shadow:0 4px 12px rgba(2,132,199,0.3);">
+          🔵 前往 KKday 預訂 (${store.affiliateConfig.kkdayDefaultBonus}) →
+        </a>
+        <br/>
+        <a href="${store.affiliateConfig.officialUrl}" target="_blank" style="display:inline-block;color:#64748b;font-weight:600;font-size:12px;text-decoration:underline;margin-top:8px;">
+          亦可至東京迪士尼官網預訂 (日圓結帳需 1.5% 海外手續費)
+        </a>
+      </div>
+
+      <div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:20px;font-size:12px;color:#94a3b8;text-align:center;">
+        東京迪士尼門票降價與人潮預報助手 · 由 ${char.name} 為您傳送開賣通知
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
           🔵 前往 KKday 預訂 (${store.affiliateConfig.kkdayDefaultBonus}) →
         </a>
         <br/>
@@ -1303,6 +1318,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       exchangeRate: rateInfo,
       subscriberCount: 12480 + store.subscribers.length,
       realSubscriberCount: store.subscribers.length,
+      gaMeasurementId: store.affiliateConfig.gaMeasurementId || process.env.VITE_GA_MEASUREMENT_ID || process.env.GA_MEASUREMENT_ID || 'G-4X9B9D4VC8',
     });
     return true;
   }
@@ -1555,6 +1571,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         klookDefaultDesc: String(body.klookDefaultDesc ?? store.affiliateConfig.klookDefaultDesc).trim(),
         kkdayDefaultBonus: String(body.kkdayDefaultBonus ?? store.affiliateConfig.kkdayDefaultBonus).trim(),
         lineOfficialUrl: String(body.lineOfficialUrl ?? store.affiliateConfig.lineOfficialUrl ?? '').trim(),
+        gaMeasurementId: String(body.gaMeasurementId ?? store.affiliateConfig.gaMeasurementId ?? 'G-4X9B9D4VC8').trim(),
         klookFeatures: Array.isArray(body.klookFeatures) ? body.klookFeatures.map(String) : store.affiliateConfig.klookFeatures,
         kkdayFeatures: Array.isArray(body.kkdayFeatures) ? body.kkdayFeatures.map(String) : store.affiliateConfig.kkdayFeatures,
       };
