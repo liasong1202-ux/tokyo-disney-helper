@@ -1,6 +1,0 @@
-{
-  "name": "東京迪士尼門票降價與人潮預報助手",
-  "description": "精準台幣低價日曆，一眼看穿東京迪士尼便宜票價日、人潮預報指數、設施維修強風預警與 Klook / KKday / 官網即時比價。",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
