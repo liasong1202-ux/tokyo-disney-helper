@@ -14,6 +14,8 @@ export interface Subscriber {
   targetDate?: string; // 若指定特定未開賣日期 e.g. '2027-01-15'
   saleOpenDate?: string; // 預計開賣日 e.g. '2026-11-15'
   characterId?: string; // 'mickey' | 'minnie' | 'donald' | 'duffy' | 'pooh'
+  lineUserId?: string; // LINE 用戶專屬 ID (用於全自動 Push 推播)
+  source?: string; // 'web' | 'line_bot'
   createdAt: string;
   lastNotifiedAt?: string;
 }
@@ -153,6 +155,10 @@ export interface EmailSettings {
   adminPassword: string;
 }
 
+export interface LineSettings {
+  channelAccessToken: string;
+}
+
 export interface StoreData {
   subscribers: Subscriber[];
   clicks: ClickLog[];
@@ -164,6 +170,7 @@ export interface StoreData {
   affiliateConfig: AffiliateConfig;
   activePromo: PromoConfig | null;
   emailSettings: EmailSettings;
+  lineSettings: LineSettings;
   exchangeRateCache: {
     rate: number;
     updatedAt: string;
@@ -220,6 +227,9 @@ const DEFAULT_STORE: StoreData = {
     fromName: '東京迪士尼降價與人潮預報助手',
     adminPassword: process.env.ADMIN_PASSWORD || 'disney888',
   },
+  lineSettings: {
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '5TTdV6PtM8CiBk+W3/M+QxpmoAVNDsZWQ6vTpCJWJBjnWpPe/qjkO+ihpB4n9Ph/JBERAcXLD3cs95qfIbfMg5J5Rhul0/O58cZJcMwtsL5Ab2DhxzWHpxJfYNrt5ouW80LCzIkCg0zT73U1E0EUXQdB04t89/1O/w1cDnyilFU=',
+  },
   exchangeRateCache: {
     rate: 0.215,
     updatedAt: new Date().toISOString(),
@@ -260,6 +270,11 @@ export function loadStore(): StoreData {
         ...DEFAULT_STORE.emailSettings,
         ...(parsed.emailSettings || {}),
         resendApiKey: parsed.emailSettings?.resendApiKey || process.env.RESEND_API_KEY || '',
+      },
+      lineSettings: {
+        ...DEFAULT_STORE.lineSettings,
+        ...(parsed.lineSettings || {}),
+        channelAccessToken: parsed.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || DEFAULT_STORE.lineSettings.channelAccessToken,
       },
       clickCounts: { ...DEFAULT_STORE.clickCounts, ...(parsed.clickCounts || {}) },
     };
@@ -918,6 +933,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         fromEmail: store.emailSettings.fromEmail,
         fromName: store.emailSettings.fromName,
       },
+      lineSettings: {
+        hasToken: Boolean(store.lineSettings?.channelAccessToken && store.lineSettings.channelAccessToken.trim().length > 0),
+        maskedToken: store.lineSettings?.channelAccessToken
+          ? `${store.lineSettings.channelAccessToken.slice(0, 8)}...${store.lineSettings.channelAccessToken.slice(-6)}`
+          : '',
+        botBasicId: '@272tfkev',
+        botName: '海外樂園門票情報',
+      },
       exchangeRateCache: store.exchangeRateCache,
       emailHistory: store.emailHistory,
     });
@@ -1193,6 +1216,209 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
 
       sendJson(res, 200, { ok: true, html, characterId });
+      return true;
+    } catch (err: any) {
+      sendJson(res, 500, { ok: false, error: err?.message });
+      return true;
+    }
+  }
+
+  // 12. 站長後台：測試 LINE 官方連線狀態
+  if (pathname === '/api/admin/test-line' && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      const store = loadStore();
+      const token = store.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+      if (!token) {
+        sendJson(res, 400, { ok: false, error: '尚未設定 LINE Channel Access Token！' });
+        return true;
+      }
+      const resInfo = await fetch('https://api.line.me/v2/bot/info', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resInfo.ok) {
+        const errText = await resInfo.text();
+        sendJson(res, 400, { ok: false, error: `LINE API 驗證失敗 (${resInfo.status}): ${errText}` });
+        return true;
+      }
+      const botInfo = await resInfo.json();
+      sendJson(res, 200, { ok: true, botInfo });
+      return true;
+    } catch (err: any) {
+      sendJson(res, 500, { ok: false, error: err?.message });
+      return true;
+    }
+  }
+
+  // 13. 站長後台：發送指定用戶的 LINE 開賣推播 (Push Message)
+  if (pathname === '/api/admin/send-line-push' && req.method === 'POST') {
+    try {
+      const store = loadStore();
+      const body = await readJsonBody(req);
+      const token = store.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+      if (!token) {
+        sendJson(res, 400, { ok: false, error: '尚未設定 LINE Channel Access Token！' });
+        return true;
+      }
+
+      const subscriberId = body.subscriberId ? String(body.subscriberId) : '';
+      const customUserId = body.userId ? String(body.userId) : '';
+      const targetSub = store.subscribers.find(s => s.id === subscriberId || (customUserId && s.lineUserId === customUserId));
+
+      const lineUserId = customUserId || targetSub?.lineUserId;
+      if (!lineUserId) {
+        sendJson(res, 400, { ok: false, error: '該訂閱者尚未綁定 LINE ID，無法發送 LINE 推播！' });
+        return true;
+      }
+
+      const targetDate = body.targetDate || targetSub?.targetDate || '2027-01-04';
+      const parkName = body.parkName || (targetSub?.targetPark === 'sea' ? '東京迪士尼海洋' : '東京迪士尼樂園');
+      const characterId = body.characterId || targetSub?.characterId || 'minnie';
+
+      const cidMatch = (store.affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
+      const activeCid = cidMatch ? cidMatch[1] : '28178';
+      let kkdayUrl = store.affiliateConfig.kkdayUrl || 'https://www.kkday.com/zh-tw/product/19252';
+      if (!kkdayUrl.includes('cid=')) {
+        kkdayUrl += `${kkdayUrl.includes('?') ? '&' : '?'}cid=${activeCid}&ud1=disney_helper`;
+      }
+      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695';
+
+      let pushText = '';
+      if (characterId === 'minnie') {
+        pushText = `🎀【專屬守護大使 · 米妮即時開賣通知】\n\n哈囉！親愛的迪士尼粉絲～💖\n您預約的【${targetDate}】${parkName}門票【今日正式開賣】囉！🏰✨\n\n熱門檔期門票開賣首日最容易搶購一空，米妮提醒您趕快把握早鳥特惠與快速出憑證搶票：\n\n👉 KKday 官方授權門票直達（享專屬方案）：\n${kkdayUrl}\n\n👉 Klook 官方授權門票直達（可累積積分折現）：\n${klookUrl}\n\n祝您與摯愛親友度過最甜蜜浪漫的夢幻迪士尼之旅！🐭💕`;
+      } else if (characterId === 'mickey') {
+        pushText = `🏰【歡樂隊長 · 米奇重要開賣提醒】\n\n嗨！好夥伴！🎉\n集結號角吹響！您鎖定的【${targetDate}】${parkName}門票【今日正式開放訂票】囉！\n\n夢幻魔法世界正在呼喚您，請儘速搶下熱門時段門票：\n\n👉 KKday 官方授權門票直達：\n${kkdayUrl}\n\n👉 Klook 官方授權門票直達：\n${klookUrl}\n\n出發！讓我們在灰姑娘城堡前相見！🐭✨`;
+      } else if (characterId === 'donald') {
+        pushText = `⚓【衝鋒隊長 · 唐老鴨大聲提醒】\n\n呱呱呱！注意啦！⚡\n您預約的【${targetDate}】${parkName}門票【今天正式開搶】！\n\n別猶豫！熱門設施與人潮不等人，現在立刻下手搶票：\n\n👉 KKday 官方特惠直達：\n${kkdayUrl}\n\n👉 Klook 官方特惠直達：\n${klookUrl}\n\n搶到了記得跟我分享喜悅，呱呱！🦆`;
+      } else {
+        pushText = `🍯【暖心大使 · 小熊維尼甜甜提醒】\n\n早安呀～吃過蜂蜜了嗎？🐻🍯\n維尼抱著甜蜜的心情告訴您：您預約的【${targetDate}】${parkName}門票【今天開賣囉】！\n\n慢慢挑選您喜歡的門票，祝您有一整天甜甜的冒險：\n\n👉 KKday 官方特惠直達：\n${kkdayUrl}\n\n👉 Klook 官方特惠直達：\n${klookUrl}\n\n記得拍好多美美的照片唷～🍯✨`;
+      }
+
+      const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          to: lineUserId,
+          messages: [{ type: 'text', text: pushText }],
+        }),
+      });
+
+      if (!resPush.ok) {
+        const errText = await resPush.text();
+        sendJson(res, 400, { ok: false, error: `LINE 推播失敗 (${resPush.status}): ${errText}` });
+        return true;
+      }
+
+      if (targetSub) {
+        targetSub.lastNotifiedAt = new Date().toISOString();
+        saveStore(store);
+      }
+
+      sendJson(res, 200, { ok: true, message: `已成功透過 LINE 推播開賣訊息至用戶 (User: ${lineUserId})` });
+      return true;
+    } catch (err: any) {
+      sendJson(res, 500, { ok: false, error: err?.message });
+      return true;
+    }
+  }
+
+  // 14. 每日零人工干預自動巡檢定時器 (Vercel Cron Job)
+  if ((pathname === '/api/cron-check-ticket-open' || pathname === '/api/admin/cron-check-ticket-open') && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      const store = loadStore();
+      const token = store.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+      
+      // 計算台灣/日本當前日期 (YYYY-MM-DD)
+      const now = new Date();
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(now);
+      
+      let matchedCount = 0;
+      let notifiedLineCount = 0;
+      let notifiedEmailCount = 0;
+      const logs: string[] = [];
+
+      const cidMatch = (store.affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
+      const activeCid = cidMatch ? cidMatch[1] : '28178';
+      let kkdayUrl = store.affiliateConfig.kkdayUrl || 'https://www.kkday.com/zh-tw/product/19252';
+      if (!kkdayUrl.includes('cid=')) {
+        kkdayUrl += `${kkdayUrl.includes('?') ? '&' : '?'}cid=${activeCid}&ud1=disney_helper`;
+      }
+      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695';
+
+      for (const sub of store.subscribers) {
+        // 比對開賣日 (若 saleOpenDate 為今日，或 targetDate 往前推 2 個月剛好為今日)
+        const isSaleToday = sub.saleOpenDate === todayStr;
+        
+        if (isSaleToday && !sub.lastNotifiedAt) {
+          matchedCount++;
+          const targetDate = sub.targetDate || '指定入園日';
+          const parkName = sub.targetPark === 'sea' ? '東京迪士尼海洋' : '東京迪士尼樂園';
+          const characterId = sub.characterId || 'minnie';
+
+          // 1. 若有 LINE ID，全自動 LINE Push 推播
+          if (sub.lineUserId && token) {
+            try {
+              const pushText = `🎀【專屬守護大使 · 米妮自動提醒】\n\n哈囉！親愛的迪士尼粉絲～💖\n系統自動為您監測到：您預約的【${targetDate}】${parkName}門票【今日正式開賣】囉！🏰✨\n\n熱門檔期首日易售罄，米妮提醒您趕快把握早鳥方案：\n\n👉 KKday 官方授權門票：\n${kkdayUrl}\n\n👉 Klook 官方授權門票：\n${klookUrl}\n\n祝您旅途愉快！🐭💕`;
+              const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  to: sub.lineUserId,
+                  messages: [{ type: 'text', text: pushText }],
+                }),
+              });
+              if (resPush.ok) {
+                notifiedLineCount++;
+                logs.push(`[LINE Success] 已自動推播給 ${sub.lineUserId} (預約: ${targetDate})`);
+              }
+            } catch (lineErr: any) {
+              logs.push(`[LINE Fail] ${sub.lineUserId}: ${lineErr?.message}`);
+            }
+          }
+
+          // 2. 若有真實 Email，且設定了 Resend Key，全自動 Email 寄送
+          if (sub.email && !sub.email.endsWith('@line.user') && store.emailSettings.resendApiKey) {
+            try {
+              const fromHeader = `${store.emailSettings.fromName} <${store.emailSettings.fromEmail}>`;
+              const subject = `🎀【門票今日開賣！】東京迪士尼【${targetDate}】早鳥特惠已開放預訂！`;
+              const html = buildTicketOpenEmailHtml(store, targetDate, parkName, undefined, characterId);
+              const resMail = await sendResendEmail({
+                apiKey: store.emailSettings.resendApiKey,
+                from: fromHeader,
+                to: [sub.email],
+                subject,
+                html,
+              });
+              if (resMail.ok) {
+                notifiedEmailCount++;
+                logs.push(`[Email Success] 已自動發送至 ${sub.email}`);
+              }
+            } catch (mailErr: any) {
+              logs.push(`[Email Fail] ${sub.email}: ${mailErr?.message}`);
+            }
+          }
+
+          sub.lastNotifiedAt = new Date().toISOString();
+        }
+      }
+
+      if (matchedCount > 0) {
+        saveStore(store);
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        today: todayStr,
+        matchedCount,
+        notifiedLineCount,
+        notifiedEmailCount,
+        logs,
+      });
       return true;
     } catch (err: any) {
       sendJson(res, 500, { ok: false, error: err?.message });

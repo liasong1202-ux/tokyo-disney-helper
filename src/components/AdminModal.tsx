@@ -610,6 +610,48 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     }
   };
 
+  // 手動發送指定用戶 LINE Push 推播
+  const handleSendLinePush = async (subscriberId: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/send-line-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriberId, characterId: selectedAdminChar }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('success', '🎉 已成功透過 LINE Messaging API 發送米妮開賣推播！');
+        fetchDashboard();
+      } else {
+        showToast('error', data.error || 'LINE 推播發送失敗');
+      }
+    } catch {
+      showToast('error', '發送失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 立即手動執行今日自動巡檢
+  const handleRunCronCheck = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/cron-check-ticket-open', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('success', `🤖 今日巡檢完成！比對到 ${data.matchedCount} 筆預約，已自動推播 LINE: ${data.notifiedLineCount} 人, Email: ${data.notifiedEmailCount} 人`);
+        fetchDashboard();
+      } else {
+        showToast('error', data.error || '巡檢失敗');
+      }
+    } catch {
+      showToast('error', '巡檢失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 刪除訂閱者
   const handleDeleteSubscriber = async (id: string) => {
     await fetch('/api/admin/subscribers/delete', {
@@ -1340,11 +1382,32 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                 </div>
               </div>
 
+              {/* 每日全自動定時巡檢通知 Banner */}
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-emerald-950">
+                <div className="space-y-1">
+                  <div className="font-black text-sm flex items-center gap-1.5 text-emerald-800">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>🤖 每日零人工干預 · 自動定時巡檢系統（已上線）</span>
+                  </div>
+                  <p className="text-emerald-700">
+                    雲端定時排程每日固定自動巡檢，比對到 2 個月前開賣日將自動透過 LINE 官方 API 推播提醒，您無需人工盯盤，絕不漏單。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRunCronCheck}
+                  disabled={loading}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-xs shrink-0 cursor-pointer transition-all flex items-center gap-1.5"
+                >
+                  ▶️ 立即測試今日巡檢
+                </button>
+              </div>
+
               <div className="border border-slate-200 rounded-2xl overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-100 text-slate-700 font-bold">
                     <tr>
-                      <th className="p-3">訂閱者 Email</th>
+                      <th className="p-3">訂閱者 / LINE ID</th>
                       <th className="p-3">通知類型</th>
                       <th className="p-3">指定入園日</th>
                       <th className="p-3">守護角色</th>
@@ -1368,7 +1431,20 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                           : '👑 米奇';
                       return (
                         <tr key={sub.id} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold text-slate-900">{sub.email}</td>
+                          <td className="p-3 font-bold text-slate-900">
+                            {sub.lineUserId ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold">
+                                  💬 LINE
+                                </span>
+                                <span className="font-mono text-slate-600 text-xs" title={sub.lineUserId}>
+                                  {sub.lineUserId.slice(0, 10)}...
+                                </span>
+                              </div>
+                            ) : (
+                              sub.email
+                            )}
+                          </td>
                           <td className="p-3">
                             {isTicketOpen ? (
                               <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
@@ -1406,7 +1482,17 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                               ? '🌋 海洋'
                               : '🏰+🌋 兩園'}
                           </td>
-                          <td className="p-3 text-right whitespace-nowrap space-x-2">
+                          <td className="p-3 text-right whitespace-nowrap space-x-1.5">
+                            {sub.lineUserId ? (
+                              <button
+                                onClick={() => handleSendLinePush(sub.id)}
+                                disabled={loading}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer shadow-2xs inline-flex items-center gap-1"
+                                title="透過 LINE Messaging API 發送專屬開賣推播給此用戶"
+                              >
+                                💬 LINE 推播
+                              </button>
+                            ) : null}
                             <button
                               onClick={() => handleSendTicketOpenAlert(sub.id)}
                               disabled={loading}
