@@ -132,7 +132,7 @@ export default function App() {
       const y = parseInt(p.get('year') || '', 10);
       if (y >= 2026 && y <= 2027) return y;
     }
-    return 2026;
+    return new Date(Date.now() + 8 * 3600 * 1000).getUTCFullYear();
   });
 
   const [selectedMonth, setSelectedMonth] = useState<number>(() => {
@@ -145,7 +145,7 @@ export default function App() {
       const m = parseInt(p.get('month') || '', 10);
       if (m >= 1 && m <= 12) return m;
     }
-    return 11;
+    return new Date(Date.now() + 8 * 3600 * 1000).getUTCMonth() + 1;
   });
 
   // 全球迪士尼樂園切換：'tokyo' | 'hongkong' | 'shanghai' | 'usa'
@@ -444,7 +444,7 @@ export default function App() {
       const d = p.get('date');
       if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
     }
-    return '2026-11-10';
+    return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
   });
 
   // 當前選取日的詳細資料
@@ -2363,7 +2363,7 @@ export default function App() {
                   </div>
                   {liveWeatherMap[currentDayData.date] && (
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      🟢 Open-Meteo 即時預報
+                      🟢 即時氣象預報
                     </span>
                   )}
                 </div>
@@ -2410,10 +2410,12 @@ export default function App() {
                     <div className="space-y-1.5 text-xs">
                       <div className="font-bold text-slate-800 flex items-center gap-1.5">
                         <Wind className="w-4 h-4 text-sky-600" />
-                        <span>園區真實天氣與海風預報</span>
+                        <span>園區天氣與海風預報</span>
                       </div>
                       <p className="text-slate-600 leading-relaxed">
-                        國際氣象預報 API（Open-Meteo）僅提供<strong>未來 16 天內</strong>的精準氣象與風速。您選取的 <strong>{currentDayData.date}</strong> 尚未進入 16 天預報窗口，建議出發前兩週回來點選日期即可查看真實氣溫與降雨機率！
+                        {currentDayData.date < new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10)
+                          ? `此日期（${currentDayData.date}）已過，請點選今日或未來 16 天內的日期查看即時氣溫、降雨機率與風速！`
+                          : `入園前 16 天內將自動顯示 ${currentDayData.date} 的當日氣溫、降雨機率與風速預報，歡迎出發前兩週回來查詢！`}
                       </p>
                     </div>
                   )}
