@@ -534,6 +534,21 @@ export default function App() {
           setSubscriberCount(data.subscriberCount);
         }
       }
+      try {
+        const localSaved = localStorage.getItem('tokyo_disney_subscribers');
+        const list = localSaved ? JSON.parse(localSaved) : [];
+        list.unshift({
+          id: 'sub-' + Date.now(),
+          email: emailInput,
+          targetMonth: subTargetMonth,
+          targetPark: subTargetPark,
+          alertType: subAlertType,
+          characterId: selectedCharacterId,
+          source: 'web',
+          createdAt: new Date().toISOString(),
+        });
+        localStorage.setItem('tokyo_disney_subscribers', JSON.stringify(list));
+      } catch {}
     } catch {
       // fallback
     } finally {
@@ -584,6 +599,21 @@ export default function App() {
           setSubscriberCount(data.subscriberCount);
         }
       }
+      try {
+        const localSaved = localStorage.getItem('tokyo_disney_subscribers');
+        const list = localSaved ? JSON.parse(localSaved) : [];
+        list.unshift({
+          id: 'sub-' + Date.now(),
+          email: emailInput,
+          targetMonth: subTargetMonth,
+          targetPark: subTargetPark,
+          alertType: subAlertType,
+          characterId: selectedCharacterId,
+          source: 'web',
+          createdAt: new Date().toISOString(),
+        });
+        localStorage.setItem('tokyo_disney_subscribers', JSON.stringify(list));
+      } catch {}
     } catch {
       // fallback
     } finally {

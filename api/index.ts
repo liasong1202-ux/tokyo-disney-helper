@@ -20,10 +20,29 @@ interface RedisConfig {
 }
 
 function getRedisConfig(): RedisConfig {
-  const url = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || '')
+  let url = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || '')
     .trim()
     .replace(/\/+$/, '');
-  const token = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '').trim();
+  let token = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '').trim();
+
+  // 若 Vercel 只有 REDIS_URL 或 KV_URL (如 rediss://default:TOKEN@HOST:PORT)，自動解析出 Upstash REST URL 與 Token
+  if ((!url || !token) && (process.env.REDIS_URL || process.env.KV_URL)) {
+    try {
+      const rawRedisUrl = process.env.REDIS_URL || process.env.KV_URL || '';
+      const parsed = new URL(rawRedisUrl);
+      if (parsed.hostname) {
+        if (!url) {
+          url = `https://${parsed.hostname}`;
+        }
+        if (!token && parsed.password) {
+          token = decodeURIComponent(parsed.password);
+        }
+      }
+    } catch (e) {
+      console.warn('[Redis Config Parse Error]', e);
+    }
+  }
+
   return {
     configured: Boolean(url && token),
     url,

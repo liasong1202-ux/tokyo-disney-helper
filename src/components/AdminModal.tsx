@@ -273,7 +273,25 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
         return;
       }
       if (data.ok) {
-        setSubscribers(data.subscribers || []);
+        // 整合伺服器訂閱名單與本地訂閱名單 (防止冷啟動掉名單)
+        let localSubs: any[] = [];
+        try {
+          const savedSubs = localStorage.getItem('tokyo_disney_subscribers');
+          if (savedSubs) localSubs = JSON.parse(savedSubs);
+        } catch {}
+        const serverSubs = Array.isArray(data.subscribers) ? data.subscribers : [];
+        const subMap = new Map();
+        [...serverSubs, ...localSubs].forEach((s) => {
+          if (s && s.email) {
+            const key = `${s.email}_${s.targetDate || s.targetMonth || 'all'}`;
+            if (!subMap.has(key)) subMap.set(key, s);
+          }
+        });
+        const mergedSubs = Array.from(subMap.values());
+        setSubscribers(mergedSubs);
+        try {
+          localStorage.setItem('tokyo_disney_subscribers', JSON.stringify(mergedSubs));
+        } catch {}
 
         // 整合伺服器數據與本地儲存（取最大值，確保不被空白冷啟動洗掉）
         const localCounts = getInitialClickCounts();
