@@ -4,6 +4,116 @@ import type { IncomingMessage, ServerResponse } from 'http';
 
 const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'store.json');
+export const REDIS_STORE_KEY = 'tokyo_disney_helper:store:v1';
+
+export interface StorageStatus {
+  mode: 'redis' | 'local_file' | 'ephemeral_warning';
+  connected: boolean;
+  provider: string;
+  error?: string;
+}
+
+interface RedisConfig {
+  configured: boolean;
+  url: string;
+  token: string;
+}
+
+function getRedisConfig(): RedisConfig {
+  const url = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || '')
+    .trim()
+    .replace(/\/+$/, '');
+  const token = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '').trim();
+  return {
+    configured: Boolean(url && token),
+    url,
+    token,
+  };
+}
+
+async function redisGetStore(cfg: RedisConfig): Promise<any | null> {
+  const res = await fetch(`${cfg.url}/get/${encodeURIComponent(REDIS_STORE_KEY)}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${cfg.token}`,
+    },
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Upstash Redis GET 失敗 (${res.status}): ${errText}`);
+  }
+  const data = (await res.json()) as { result?: unknown; error?: string };
+  if (data.error) {
+    throw new Error(`Upstash Redis GET 錯誤: ${data.error}`);
+  }
+  if (data.result === null || data.result === undefined || data.result === '') {
+    return null;
+  }
+  if (typeof data.result === 'string') {
+    return JSON.parse(data.result);
+  }
+  if (typeof data.result === 'object') {
+    return data.result;
+  }
+  return null;
+}
+
+async function redisSetStore(cfg: RedisConfig, store: any): Promise<void> {
+  const res = await fetch(cfg.url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${cfg.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(['SET', REDIS_STORE_KEY, JSON.stringify(store)]),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Upstash Redis SET 失敗 (${res.status}): ${errText}`);
+  }
+  const data = (await res.json()) as { result?: unknown; error?: string };
+  if (data.error) {
+    throw new Error(`Upstash Redis SET 錯誤: ${data.error}`);
+  }
+}
+
+/**
+ * 計算東京迪士尼官方 2 個月前開賣日期
+ * 若 2 個月前該月無對應日期（如 4/30 -> 2 月無 30 日），順延至次月 1 日（3/1）。
+ */
+export function calculateSaleOpenDate(targetDateStr: string): string {
+  try {
+    const parts = targetDateStr.split('-').map(Number);
+    if (parts.length === 3 && !parts.some((n) => Number.isNaN(n))) {
+      const origYear = parts[0];
+      const origMonth = parts[1];
+      const origDay = parts[2];
+
+      let openYear = origYear;
+      let openMonth = origMonth - 2;
+      if (openMonth <= 0) {
+        openMonth += 12;
+        openYear -= 1;
+      }
+
+      const daysInOpenMonth = new Date(openYear, openMonth, 0).getDate();
+      let openDay = origDay;
+      if (origDay > daysInOpenMonth) {
+        openMonth += 1;
+        if (openMonth > 12) {
+          openMonth = 1;
+          openYear += 1;
+        }
+        openDay = 1;
+      }
+
+      const mm = String(openMonth).padStart(2, '0');
+      const dd = String(openDay).padStart(2, '0');
+      return `${openYear}-${mm}-${dd}`;
+    }
+  } catch {}
+  return targetDateStr;
+}
 
 export interface Subscriber {
   id: string;
@@ -228,7 +338,7 @@ const DEFAULT_STORE: StoreData = {
     adminPassword: process.env.ADMIN_PASSWORD || 'disney888',
   },
   lineSettings: {
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '5TTdV6PtM8CiBk+W3/M+QxpmoAVNDsZWQ6vTpCJWJBjnWpPe/qjkO+ihpB4n9Ph/JBERAcXLD3cs95qfIbfMg5J5Rhul0/O58cZJcMwtsL5Ab2DhxzWHpxJfYNrt5ouW80LCzIkCg0zT73U1E0EUXQdB04t89/1O/w1cDnyilFU=',
+    channelAccessToken: '',
   },
   exchangeRateCache: {
     rate: 0.215,
@@ -238,73 +348,194 @@ const DEFAULT_STORE: StoreData = {
   emailHistory: [],
 };
 
-// 記憶體備援快取 (防止在 Serverless 唯讀或冷啟動環境下噴錯)
+// 記憶體備援快取與即時儲存狀態追蹤
 let memoryStore: StoreData = structuredClone(DEFAULT_STORE);
+let lastStorageStatus: StorageStatus = {
+  mode: 'local_file',
+  connected: false,
+  provider: '尚未載入',
+};
 
-export function loadStore(): StoreData {
+function mergeWithDefaultStore(parsed: any): StoreData {
+  const safeParsed = parsed && typeof parsed === 'object' ? parsed : {};
+  return {
+    ...DEFAULT_STORE,
+    ...safeParsed,
+    subscribers: Array.isArray(safeParsed.subscribers) ? safeParsed.subscribers : DEFAULT_STORE.subscribers,
+    clicks: Array.isArray(safeParsed.clicks) ? safeParsed.clicks : DEFAULT_STORE.clicks,
+    clickCounts: { ...DEFAULT_STORE.clickCounts, ...(safeParsed.clickCounts || {}) },
+    affiliateConfig: { ...DEFAULT_STORE.affiliateConfig, ...(safeParsed.affiliateConfig || {}) },
+    activePromo: safeParsed.activePromo !== undefined ? safeParsed.activePromo : DEFAULT_STORE.activePromo,
+    emailSettings: {
+      ...DEFAULT_STORE.emailSettings,
+      ...(safeParsed.emailSettings || {}),
+      resendApiKey: safeParsed.emailSettings?.resendApiKey || (process.env.RESEND_API_KEY || '').trim(),
+      adminPassword: safeParsed.emailSettings?.adminPassword || (process.env.ADMIN_PASSWORD || '').trim() || 'disney888',
+    },
+    lineSettings: {
+      channelAccessToken: safeParsed.lineSettings?.channelAccessToken || '',
+    },
+    exchangeRateCache: safeParsed.exchangeRateCache
+      ? { ...DEFAULT_STORE.exchangeRateCache, ...safeParsed.exchangeRateCache }
+      : { ...DEFAULT_STORE.exchangeRateCache },
+    emailHistory: Array.isArray(safeParsed.emailHistory) ? safeParsed.emailHistory : DEFAULT_STORE.emailHistory,
+  };
+}
+
+export async function loadStore(): Promise<StoreData> {
+  const redisCfg = getRedisConfig();
+  if (redisCfg.configured) {
+    try {
+      const parsed = await redisGetStore(redisCfg);
+      if (parsed === null) {
+        const initial = mergeWithDefaultStore({});
+        await redisSetStore(redisCfg, initial);
+        lastStorageStatus = {
+          mode: 'redis',
+          connected: true,
+          provider: 'Upstash Redis (雲端永久保存)',
+        };
+        memoryStore = initial;
+        return initial;
+      }
+      const merged = mergeWithDefaultStore(parsed);
+      lastStorageStatus = {
+        mode: 'redis',
+        connected: true,
+        provider: 'Upstash Redis (雲端永久保存)',
+      };
+      memoryStore = merged;
+      return merged;
+    } catch (err: any) {
+      const errMsg = err?.message || 'Redis 連線失敗';
+      console.error('[Redis loadStore Error]', errMsg);
+      lastStorageStatus = {
+        mode: 'redis',
+        connected: false,
+        provider: 'Upstash Redis',
+        error: errMsg,
+      };
+      return mergeWithDefaultStore(memoryStore);
+    }
+  }
+
+  // 未設定 Redis 時使用檔案儲存；若在 Vercel 線上環境則明確回報暫存警告
+  const isVercel = Boolean(process.env.VERCEL);
+  if (isVercel) {
+    console.warn(
+      '[Storage WARNING] 尚未設定 Upstash Redis (KV_REST_API_URL / UPSTASH_REDIS_REST_URL)，目前讀寫 Vercel 暫存區 /tmp，跨天與冷啟動將遺失資料！'
+    );
+    lastStorageStatus = {
+      mode: 'ephemeral_warning',
+      connected: false,
+      provider: 'Vercel 暫存區 (/tmp)',
+      error: '尚未連結免費 Upstash Redis 資料庫！目前資料僅存於暫存區，跨日與重新部署後會清空。請至 Vercel Storage 建立 Upstash Redis。',
+    };
+  } else {
+    lastStorageStatus = {
+      mode: 'local_file',
+      connected: true,
+      provider: '本機 JSON 檔案 (開發模式)',
+    };
+  }
+
   try {
     if (!fs.existsSync(DATA_DIR)) {
       try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       } catch {
-        // 在無權限建立目錄時直接返回記憶體備援
-        return memoryStore;
+        return mergeWithDefaultStore(memoryStore);
       }
     }
     if (!fs.existsSync(DB_FILE)) {
+      const initial = mergeWithDefaultStore({});
       try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(DEFAULT_STORE, null, 2), 'utf-8');
+        fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8');
       } catch {
-        return memoryStore;
+        return initial;
       }
-      memoryStore = structuredClone(DEFAULT_STORE);
+      memoryStore = initial;
       return memoryStore;
     }
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
-    const result: StoreData = {
-      ...DEFAULT_STORE,
-      ...parsed,
-      affiliateConfig: { ...DEFAULT_STORE.affiliateConfig, ...(parsed.affiliateConfig || {}) },
-      emailSettings: {
-        ...DEFAULT_STORE.emailSettings,
-        ...(parsed.emailSettings || {}),
-        resendApiKey: parsed.emailSettings?.resendApiKey || process.env.RESEND_API_KEY || '',
-      },
-      lineSettings: {
-        ...DEFAULT_STORE.lineSettings,
-        ...(parsed.lineSettings || {}),
-        channelAccessToken: parsed.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || DEFAULT_STORE.lineSettings.channelAccessToken,
-      },
-      clickCounts: { ...DEFAULT_STORE.clickCounts, ...(parsed.clickCounts || {}) },
-    };
+    const result = mergeWithDefaultStore(parsed);
     memoryStore = result;
     return result;
-  } catch (err) {
+  } catch (err: any) {
     console.warn('Failed to load store from disk, using memory store:', err);
-    return memoryStore;
+    if (!isVercel) {
+      lastStorageStatus = {
+        mode: 'local_file',
+        connected: false,
+        provider: '本機 JSON 檔案',
+        error: err?.message || '讀取本機檔案失敗',
+      };
+    }
+    return mergeWithDefaultStore(memoryStore);
   }
 }
 
-export function saveStore(data: StoreData): void {
+export async function saveStore(data: StoreData): Promise<{ ok: boolean; storageStatus: StorageStatus }> {
   memoryStore = data;
+  const redisCfg = getRedisConfig();
+  if (redisCfg.configured) {
+    try {
+      await redisSetStore(redisCfg, data);
+      lastStorageStatus = {
+        mode: 'redis',
+        connected: true,
+        provider: 'Upstash Redis (雲端永久保存)',
+      };
+      return { ok: true, storageStatus: lastStorageStatus };
+    } catch (err: any) {
+      const errMsg = err?.message || 'Redis 寫入失敗';
+      console.error('[Redis saveStore Error]', errMsg);
+      lastStorageStatus = {
+        mode: 'redis',
+        connected: false,
+        provider: 'Upstash Redis',
+        error: errMsg,
+      };
+      return { ok: false, storageStatus: lastStorageStatus };
+    }
+  }
+
+  const isVercel = Boolean(process.env.VERCEL);
+  if (isVercel) {
+    lastStorageStatus = {
+      mode: 'ephemeral_warning',
+      connected: false,
+      provider: 'Vercel 暫存區 (/tmp)',
+      error: '尚未連結免費 Upstash Redis 資料庫！目前資料僅存於暫存區，跨日與重新部署後會清空。請至 Vercel Storage 建立 Upstash Redis。',
+    };
+  } else {
+    lastStorageStatus = {
+      mode: 'local_file',
+      connected: true,
+      provider: '本機 JSON 檔案 (開發模式)',
+    };
+  }
+
   try {
     if (!fs.existsSync(DATA_DIR)) {
       try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       } catch {
-        return;
+        return { ok: false, storageStatus: lastStorageStatus };
       }
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (err) {
+    return { ok: !isVercel, storageStatus: lastStorageStatus };
+  } catch (err: any) {
     console.warn('Failed to save store to disk, persisted in memory:', err);
+    return { ok: false, storageStatus: lastStorageStatus };
   }
 }
 
 // 自動抓取最新日圓對台幣匯率 (JPY -> TWD)
 export async function fetchLatestJpyRate(force = false): Promise<{ rate: number; updatedAt: string; source: string }> {
-  const store = loadStore();
+  const store = await loadStore();
   const lastUpdated = new Date(store.exchangeRateCache.updatedAt).getTime();
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
@@ -324,7 +555,7 @@ export async function fetchLatestJpyRate(force = false): Promise<{ rate: number;
           updatedAt: new Date().toISOString(),
           source: '國際即時匯率 API (自動同步)',
         };
-        saveStore(store);
+        await saveStore(store);
         return store.exchangeRateCache;
       }
     }
@@ -685,6 +916,28 @@ function sendJson(res: ServerResponse, status: number, payload: any) {
   res.end(JSON.stringify(payload));
 }
 
+export function buildLinePushText(
+  characterId: string,
+  targetDate: string,
+  parkName: string,
+  kkdayUrl: string,
+  klookUrl: string
+): string {
+  if (characterId === 'minnie') {
+    return `🎀【米妮提醒：門票今天開賣囉！】\n\n親愛的！您預約的【${targetDate}】${parkName}門票今日正式開賣囉！🏰✨\n熱門票跑很快，趕快去搶早鳥票吧～\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
+  }
+  if (characterId === 'mickey') {
+    return `🏰【米奇提醒：門票今天開賣囉！】\n\n嗨！好夥伴！您預約的【${targetDate}】${parkName}門票今天開賣囉！🎉\n熱門時段搶得快，快去搶票吧：\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
+  }
+  if (characterId === 'donald') {
+    return `⚓【唐老鴨提醒：門票今天開賣！】\n\n呱呱！您預約的【${targetDate}】${parkName}門票開搶啦！⚡\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
+  }
+  if (characterId === 'duffy') {
+    return `🧸【達菲熊提醒：門票今天開賣囉！】\n\n嗨～達菲帶著溫暖微笑提醒您！🌟\n您預約的【${targetDate}】${parkName}門票今天開賣囉，快來把票帶回家吧：\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
+  }
+  return `🍯【小熊維尼提醒：門票今天開賣囉！】\n\n早安呀！您預約的【${targetDate}】${parkName}門票今天開賣囉～🍯\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
+}
+
 export async function handleApiRequest(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const reqUrl = req.url || '/';
   const urlObj = new URL(reqUrl, 'http://localhost');
@@ -713,7 +966,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 1. 取得前端公開狀態 (聯盟行銷連結、目前生效中的促銷、最新匯率、總訂閱人數)
   if (pathname === '/api/public-state' && req.method === 'GET') {
     const rateInfo = await fetchLatestJpyRate(false);
-    const store = loadStore();
+    const store = await loadStore();
     sendJson(res, 200, {
       affiliateConfig: store.affiliateConfig,
       activePromo: store.activePromo,
@@ -740,7 +993,11 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const targetPark = (body.targetPark || 'both') as 'land' | 'sea' | 'both';
       const alertType = (body.alertType || 'both') as 'promo' | 'ticket_open' | 'both';
       const targetDate = body.targetDate ? String(body.targetDate) : undefined;
-      const saleOpenDate = body.saleOpenDate ? String(body.saleOpenDate) : undefined;
+      const saleOpenDate = body.saleOpenDate
+        ? String(body.saleOpenDate)
+        : targetDate
+        ? calculateSaleOpenDate(targetDate)
+        : undefined;
       const characterId = body.characterId ? String(body.characterId) : 'mickey';
 
       if (!email || !email.includes('@')) {
@@ -748,7 +1005,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
-      const store = loadStore();
+      const store = await loadStore();
       let subscriber = store.subscribers.find(
         (s) => s.email === email && (s.targetDate || '') === (targetDate || '')
       );
@@ -764,10 +1021,11 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           targetDate,
           saleOpenDate,
           characterId,
+          source: 'web',
           createdAt: new Date().toISOString(),
         };
         store.subscribers.unshift(subscriber);
-        saveStore(store);
+        await saveStore(store);
       } else {
         subscriber.targetMonth = targetMonth;
         subscriber.targetPark = targetPark;
@@ -775,7 +1033,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         subscriber.targetDate = targetDate;
         subscriber.saleOpenDate = saleOpenDate;
         subscriber.characterId = characterId;
-        saveStore(store);
+        await saveStore(store);
       }
 
       // 若有設定 Resend API Key，自動寄送歡迎確認信
@@ -800,6 +1058,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         isNew,
         welcomeEmailSent,
         subscriberCount: 12480 + store.subscribers.length,
+        storageStatus: lastStorageStatus,
       });
       return true;
     } catch (err: any) {
@@ -818,7 +1077,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const ticketType = (body.ticketType || 'adult') as 'adult' | 'junior' | 'child';
       const priceTwd = Number(body.priceTwd || 0);
 
-      const store = loadStore();
+      const store = await loadStore();
       store.clickCounts[platform] = (store.clickCounts[platform] || 0) + 1;
       store.clicks.unshift({
         id: `clk-${Date.now()}`,
@@ -834,7 +1093,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       if (store.clicks.length > 500) {
         store.clicks = store.clicks.slice(0, 500);
       }
-      saveStore(store);
+      await saveStore(store);
 
       const targetUrl =
         platform === 'Klook'
@@ -865,7 +1124,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (pathname === '/api/admin/login' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
-      const store = loadStore();
+      const store = await loadStore();
       const expectedPassword = store.emailSettings.adminPassword || 'disney888';
       const inputPass = String(body.password || '').trim();
 
@@ -885,7 +1144,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (pathname === '/api/admin/change-password' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
-      const store = loadStore();
+      const store = await loadStore();
       const expectedPassword = store.emailSettings.adminPassword || 'disney888';
       const oldPass = String(body.oldPassword || '').trim();
       const newPass = String(body.newPassword || '').trim();
@@ -901,7 +1160,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
 
       store.emailSettings.adminPassword = newPass;
-      saveStore(store);
+      await saveStore(store);
       sendJson(res, 200, { ok: true, message: '站長密碼修改成功！新密碼已立即生效。', token: newPass });
       return true;
     } catch (err: any) {
@@ -912,11 +1171,12 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
   // 5. 站長後台：讀取完整後台統計與設定
   if (pathname === '/api/admin/dashboard' && req.method === 'GET') {
-    const store = loadStore();
+    const store = await loadStore();
     if (!isAuthorizedAdmin(req, store)) {
       sendJson(res, 401, { ok: false, error: '未授權訪問！請先輸入站長密碼登入。' });
       return true;
     }
+    const effectiveLineToken = (process.env.LINE_CHANNEL_ACCESS_TOKEN || store.lineSettings?.channelAccessToken || '').trim();
     sendJson(res, 200, {
       ok: true,
       subscribers: store.subscribers,
@@ -934,13 +1194,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         fromName: store.emailSettings.fromName,
       },
       lineSettings: {
-        hasToken: Boolean(store.lineSettings?.channelAccessToken && store.lineSettings.channelAccessToken.trim().length > 0),
-        maskedToken: store.lineSettings?.channelAccessToken
-          ? `${store.lineSettings.channelAccessToken.slice(0, 8)}...${store.lineSettings.channelAccessToken.slice(-6)}`
+        hasToken: Boolean(effectiveLineToken),
+        maskedToken: effectiveLineToken
+          ? `${effectiveLineToken.slice(0, 8)}...${effectiveLineToken.slice(-6)}`
           : '',
         botBasicId: '@272tfkev',
         botName: '海外樂園門票情報',
       },
+      storageStatus: lastStorageStatus,
       exchangeRateCache: store.exchangeRateCache,
       emailHistory: store.emailHistory,
     });
@@ -950,7 +1211,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 6. 站長後台：儲存聯盟行銷連結與常駐折扣碼設定
   if (pathname === '/api/admin/affiliate' && req.method === 'POST') {
     try {
-      const store = loadStore();
+      const store = await loadStore();
       if (!isAuthorizedAdmin(req, store)) {
         sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
         return true;
@@ -967,8 +1228,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         klookFeatures: Array.isArray(body.klookFeatures) ? body.klookFeatures.map(String) : store.affiliateConfig.klookFeatures,
         kkdayFeatures: Array.isArray(body.kkdayFeatures) ? body.kkdayFeatures.map(String) : store.affiliateConfig.kkdayFeatures,
       };
-      saveStore(store);
-      sendJson(res, 200, { ok: true, affiliateConfig: store.affiliateConfig });
+      await saveStore(store);
+      sendJson(res, 200, { ok: true, affiliateConfig: store.affiliateConfig, storageStatus: lastStorageStatus });
       return true;
     } catch (err: any) {
       sendJson(res, 500, { ok: false, error: err?.message });
@@ -979,7 +1240,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 7. 站長後台：儲存 Resend API Key 與寄件人設定
   if (pathname === '/api/admin/email-settings' && req.method === 'POST') {
     try {
-      const store = loadStore();
+      const store = await loadStore();
       if (!isAuthorizedAdmin(req, store)) {
         sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
         return true;
@@ -994,8 +1255,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       if (typeof body.fromName === 'string' && body.fromName.trim()) {
         store.emailSettings.fromName = body.fromName.trim();
       }
-      saveStore(store);
-      sendJson(res, 200, { ok: true });
+      await saveStore(store);
+      sendJson(res, 200, { ok: true, storageStatus: lastStorageStatus });
       return true;
     } catch (err: any) {
       sendJson(res, 500, { ok: false, error: err?.message });
@@ -1006,7 +1267,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 8. 站長後台：發布/關閉全站促銷特惠，並可選擇是否同時透過 Resend 群發通知信
   if (pathname === '/api/admin/promo' && req.method === 'POST') {
     try {
-      const store = loadStore();
+      const store = await loadStore();
       if (!isAuthorizedAdmin(req, store)) {
         sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
         return true;
@@ -1015,7 +1276,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       if (!body.active) {
         store.activePromo = null;
-        saveStore(store);
+        await saveStore(store);
         sendJson(res, 200, { ok: true, activePromo: null });
         return true;
       }
@@ -1032,7 +1293,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       };
 
       store.activePromo = newPromo;
-      saveStore(store);
+      await saveStore(store);
 
       // 若勾選「同時發送 Email 通知所有訂閱者」
       let emailBroadcastResult: { attempted: boolean; sentCount: number; error?: string } = {
@@ -1042,7 +1303,9 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       if (body.sendEmailBroadcast) {
         emailBroadcastResult.attempted = true;
-        const recipients = store.subscribers.map((s) => s.email).filter((e) => !e.endsWith('@example.com'));
+        const recipients = store.subscribers
+          .map((s) => s.email)
+          .filter((e) => !e.endsWith('@example.com') && !e.endsWith('@line.user'));
 
         if (recipients.length === 0) {
           emailBroadcastResult.error = '目前尚無真實訂閱者信箱（請先在前台輸入您的真實信箱訂閱測試！）';
@@ -1083,7 +1346,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
             sentAt: new Date().toISOString(),
             status: successCount > 0 ? `成功寄出 ${successCount} 封` : `失敗: ${lastError}`,
           });
-          saveStore(store);
+          await saveStore(store);
         }
       }
 
@@ -1101,10 +1364,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
   // 9. 站長後台：刪除單一訂閱者
   if (pathname === '/api/admin/subscribers/delete' && req.method === 'POST') {
+    const store = await loadStore();
+    if (!isAuthorizedAdmin(req, store)) {
+      sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
+      return true;
+    }
     const body = await readJsonBody(req);
-    const store = loadStore();
     store.subscribers = store.subscribers.filter((s) => s.id !== body.id);
-    saveStore(store);
+    await saveStore(store);
     sendJson(res, 200, { ok: true, subscribers: store.subscribers });
     return true;
   }
@@ -1112,8 +1379,12 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 10. 站長後台：一鍵寄送「指定日期開放訂票通知信」給預約開賣提醒的訂閱者
   if (pathname === '/api/admin/send-open-alert' && req.method === 'POST') {
     try {
+      const store = await loadStore();
+      if (!isAuthorizedAdmin(req, store)) {
+        sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
+        return true;
+      }
       const body = await readJsonBody(req);
-      const store = loadStore();
 
       if (!store.emailSettings.resendApiKey) {
         sendJson(res, 400, {
@@ -1128,7 +1399,10 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const targets = targetSubId
         ? store.subscribers.filter((s) => s.id === targetSubId)
         : store.subscribers.filter(
-            (s) => (s.alertType === 'ticket_open' || Boolean(s.targetDate)) && !s.email.endsWith('@example.com')
+            (s) =>
+              (s.alertType === 'ticket_open' || Boolean(s.targetDate)) &&
+              !s.email.endsWith('@example.com') &&
+              !s.email.endsWith('@line.user')
           );
 
       if (targets.length === 0) {
@@ -1181,7 +1455,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         sentAt: new Date().toISOString(),
         status: sentCount > 0 ? `成功寄出 ${sentCount} 封` : `失敗: ${lastError}`,
       });
-      saveStore(store);
+      await saveStore(store);
 
       if (sentCount === 0 && lastError) {
         sendJson(res, 400, { ok: false, error: lastError });
@@ -1199,7 +1473,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 11. 站長後台：預覽 5 大迪士尼角色的開賣通知 Email HTML
   if ((pathname === '/api/admin/preview-open-email' || pathname === '/api/preview-open-email' || pathname === '/api/admin/preview-ticket-open-email') && (req.method === 'GET' || req.method === 'POST')) {
     try {
-      const store = loadStore();
+      const store = await loadStore();
       const body = req.method === 'POST' ? await readJsonBody(req) : {};
       const targetDate = body.targetDate || urlObj.searchParams.get('targetDate') || urlObj.searchParams.get('date') || '2027-01-04';
       const parkLabel = body.parkLabel || urlObj.searchParams.get('park') || '🏰 東京迪士尼樂園 / 海洋';
@@ -1207,7 +1481,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const customNote = body.customNote || undefined;
 
       const html = buildTicketOpenEmailHtml(store, targetDate, parkLabel, customNote, characterId);
-      
+
       if (urlObj.searchParams.get('raw') === '1' || req.method === 'GET') {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1226,10 +1500,17 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 12. 站長後台：測試 LINE 官方連線狀態
   if (pathname === '/api/admin/test-line' && (req.method === 'GET' || req.method === 'POST')) {
     try {
-      const store = loadStore();
-      const token = store.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+      const store = await loadStore();
+      if (!isAuthorizedAdmin(req, store)) {
+        sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
+        return true;
+      }
+      const token = (process.env.LINE_CHANNEL_ACCESS_TOKEN || store.lineSettings?.channelAccessToken || '').trim();
       if (!token) {
-        sendJson(res, 400, { ok: false, error: '尚未設定 LINE Channel Access Token！' });
+        sendJson(res, 400, {
+          ok: false,
+          error: '尚未設定 LINE_CHANNEL_ACCESS_TOKEN 環境變數！請至 Vercel Settings > Environment Variables 填入您的 LINE Channel Access Token。',
+        });
         return true;
       }
       const resInfo = await fetch('https://api.line.me/v2/bot/info', {
@@ -1241,7 +1522,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
       const botInfo = await resInfo.json();
-      sendJson(res, 200, { ok: true, botInfo });
+      sendJson(res, 200, { ok: true, botInfo, storageStatus: lastStorageStatus });
       return true;
     } catch (err: any) {
       sendJson(res, 500, { ok: false, error: err?.message });
@@ -1252,11 +1533,18 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // 13. 站長後台：發送指定用戶的 LINE 開賣推播 (Push Message)
   if (pathname === '/api/admin/send-line-push' && req.method === 'POST') {
     try {
-      const store = loadStore();
+      const store = await loadStore();
+      if (!isAuthorizedAdmin(req, store)) {
+        sendJson(res, 401, { ok: false, error: '未授權操作！請先登入站長管理後台。' });
+        return true;
+      }
       const body = await readJsonBody(req);
-      const token = store.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
+      const token = (process.env.LINE_CHANNEL_ACCESS_TOKEN || store.lineSettings?.channelAccessToken || '').trim();
       if (!token) {
-        sendJson(res, 400, { ok: false, error: '尚未設定 LINE Channel Access Token！' });
+        sendJson(res, 400, {
+          ok: false,
+          error: '尚未設定 LINE_CHANNEL_ACCESS_TOKEN 環境變數！請至 Vercel Settings > Environment Variables 填入您的 LINE Channel Access Token。',
+        });
         return true;
       }
 
@@ -1272,7 +1560,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       const targetDate = body.targetDate || targetSub?.targetDate || '2027-01-04';
       const parkName = body.parkName || (targetSub?.targetPark === 'sea' ? '東京迪士尼海洋' : '東京迪士尼樂園');
-      const characterId = body.characterId || targetSub?.characterId || 'minnie';
+      const characterId = targetSub?.characterId || body.characterId || 'minnie';
 
       const cidMatch = (store.affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
       const activeCid = cidMatch ? cidMatch[1] : '28178';
@@ -1282,17 +1570,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       }
       const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695';
 
-      let pushText = '';
-      if (characterId === 'minnie') {
-        pushText = `🎀【米妮提醒：門票今天開賣囉！】\n\n親愛的！您預約的【${targetDate}】${parkName}門票今日正式開賣囉！🏰✨\n熱門票跑很快，趕快去搶早鳥票吧～\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
-      } else if (characterId === 'mickey') {
-        pushText = `🏰【米奇提醒：門票今天開賣囉！】\n\n嗨！好夥伴！您預約的【${targetDate}】${parkName}門票今天開賣囉！🎉\n熱門時段搶得快，快去搶票吧：\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
-      } else if (characterId === 'donald') {
-        pushText = `⚓【唐老鴨提醒：門票今天開賣！】\n\n呱呱！您預約的【${targetDate}】${parkName}門票開搶啦！⚡\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
-      } else {
-        pushText = `🍯【小熊維尼提醒：門票今天開賣囉！】\n\n早安呀！您預約的【${targetDate}】${parkName}門票今天開賣囉～🍯\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
-      }
-
+      const pushText = buildLinePushText(characterId, targetDate, parkName, kkdayUrl, klookUrl);
       const cardImageUrl = 'https://tokyo-disney-helper.vercel.app/characters/vip_invitation_card.jpg';
 
       const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
@@ -1323,12 +1601,24 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         return true;
       }
 
+      const charInfo = CHARACTERS_MAP[characterId] || CHARACTERS_MAP.minnie;
       if (targetSub) {
         targetSub.lastNotifiedAt = new Date().toISOString();
-        saveStore(store);
       }
+      store.emailHistory.unshift({
+        id: `line-push-${Date.now()}`,
+        subject: `💬 LINE 推播 (${charInfo.shortName} · ${targetDate})`,
+        recipientCount: 1,
+        sentAt: new Date().toISOString(),
+        status: `成功推播至 ${lineUserId.slice(0, 10)}...`,
+      });
+      await saveStore(store);
 
-      sendJson(res, 200, { ok: true, message: `已成功透過 LINE 推播開賣訊息至用戶 (User: ${lineUserId})` });
+      sendJson(res, 200, {
+        ok: true,
+        message: `🎉 已成功透過 LINE 發送【${charInfo.shortName}】VIP 邀請卡與開賣推播！`,
+        storageStatus: lastStorageStatus,
+      });
       return true;
     } catch (err: any) {
       sendJson(res, 500, { ok: false, error: err?.message });
@@ -1336,16 +1626,29 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     }
   }
 
-  // 14. 每日零人工干預自動巡檢定時器 (Vercel Cron Job)
+  // 14. 每日零人工干預自動巡檢定時器 (Vercel Cron Job / 站長手動一鍵測試)
   if ((pathname === '/api/cron-check-ticket-open' || pathname === '/api/admin/cron-check-ticket-open') && (req.method === 'GET' || req.method === 'POST')) {
     try {
-      const store = loadStore();
-      const token = store.lineSettings?.channelAccessToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
-      
+      const store = await loadStore();
+      const cronSecret = (process.env.CRON_SECRET || '').trim();
+      const authHeader = (req.headers['authorization'] || '') as string;
+      const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const isCronHeader =
+        Boolean(req.headers['x-vercel-cron']) ||
+        String(req.headers['user-agent'] || '').toLowerCase().includes('vercel-cron');
+      const isAuthorizedCron = cronSecret ? bearerToken === cronSecret : isCronHeader;
+
+      if (!isAuthorizedAdmin(req, store) && !isAuthorizedCron) {
+        sendJson(res, 401, { ok: false, error: '未授權執行排程！需具備站長登入權限或合法的 Vercel Cron 憑證。' });
+        return true;
+      }
+
+      const token = (process.env.LINE_CHANNEL_ACCESS_TOKEN || store.lineSettings?.channelAccessToken || '').trim();
+
       // 計算台灣/日本當前日期 (YYYY-MM-DD)
       const now = new Date();
       const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(now);
-      
+
       let matchedCount = 0;
       let notifiedLineCount = 0;
       let notifiedEmailCount = 0;
@@ -1360,47 +1663,62 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695';
 
       for (const sub of store.subscribers) {
-        // 比對開賣日 (若 saleOpenDate 為今日，或 targetDate 往前推 2 個月剛好為今日)
-        const isSaleToday = sub.saleOpenDate === todayStr;
-        
+        const effectiveSaleOpenDate =
+          sub.saleOpenDate || (sub.targetDate ? calculateSaleOpenDate(sub.targetDate) : '');
+        const isSaleToday = Boolean(effectiveSaleOpenDate && effectiveSaleOpenDate === todayStr);
+
         if (isSaleToday && !sub.lastNotifiedAt) {
           matchedCount++;
+          let sentAnyForSub = false;
           const targetDate = sub.targetDate || '指定入園日';
-          const parkName = sub.targetPark === 'sea' ? '東京迪士尼海洋' : '東京迪士尼樂園';
+          const parkName =
+            sub.targetPark === 'sea'
+              ? '東京迪士尼海洋'
+              : sub.targetPark === 'land'
+              ? '東京迪士尼樂園'
+              : '東京迪士尼';
           const characterId = sub.characterId || 'minnie';
 
-          // 1. 若有 LINE ID，全自動 LINE Push 推播
-          if (sub.lineUserId && token) {
-            try {
-              const cardImageUrl = 'https://tokyo-disney-helper.vercel.app/characters/vip_invitation_card.jpg';
-              const pushText = `🎀【米妮提醒：門票今天開賣囉！】\n\n親愛的！您預約的【${targetDate}】${parkName}門票今日正式開賣囉！🏰✨\n熱門票跑很快，趕快去搶早鳥票吧～\n\n👉 KKday 官方特惠門票：\n${kkdayUrl}\n\n👉 Klook 官方特惠門票：\n${klookUrl}`;
-              const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  to: sub.lineUserId,
-                  messages: [
-                    {
-                      type: 'image',
-                      originalContentUrl: cardImageUrl,
-                      previewImageUrl: cardImageUrl,
-                    },
-                    {
-                      type: 'text',
-                      text: pushText,
-                    },
-                  ],
-                }),
-              });
-              if (resPush.ok) {
-                notifiedLineCount++;
-                logs.push(`[LINE Success] 已自動推播給 ${sub.lineUserId} (預約: ${targetDate})`);
+          // 1. 若有 LINE ID，全自動 LINE Push 推播 (使用專屬角色文案 + VIP 邀請卡)
+          if (sub.lineUserId) {
+            if (!token) {
+              logs.push(`[LINE Skip] 尚未設定 LINE_CHANNEL_ACCESS_TOKEN，無法推播給 ${sub.lineUserId}`);
+            } else {
+              try {
+                const cardImageUrl = 'https://tokyo-disney-helper.vercel.app/characters/vip_invitation_card.jpg';
+                const pushText = buildLinePushText(characterId, targetDate, parkName, kkdayUrl, klookUrl);
+                const resPush = await fetch('https://api.line.me/v2/bot/message/push', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    to: sub.lineUserId,
+                    messages: [
+                      {
+                        type: 'image',
+                        originalContentUrl: cardImageUrl,
+                        previewImageUrl: cardImageUrl,
+                      },
+                      {
+                        type: 'text',
+                        text: pushText,
+                      },
+                    ],
+                  }),
+                });
+                if (resPush.ok) {
+                  notifiedLineCount++;
+                  sentAnyForSub = true;
+                  logs.push(`[LINE Success] 已自動推播(${characterId})給 ${sub.lineUserId} (入園日: ${targetDate})`);
+                } else {
+                  const errText = await resPush.text();
+                  logs.push(`[LINE Fail HTTP ${resPush.status}] ${sub.lineUserId}: ${errText}`);
+                }
+              } catch (lineErr: any) {
+                logs.push(`[LINE Fail] ${sub.lineUserId}: ${lineErr?.message}`);
               }
-            } catch (lineErr: any) {
-              logs.push(`[LINE Fail] ${sub.lineUserId}: ${lineErr?.message}`);
             }
           }
 
@@ -1408,7 +1726,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           if (sub.email && !sub.email.endsWith('@line.user') && store.emailSettings.resendApiKey) {
             try {
               const fromHeader = `${store.emailSettings.fromName} <${store.emailSettings.fromEmail}>`;
-              const subject = `🎀【門票今日開賣！】東京迪士尼【${targetDate}】早鳥特惠已開放預訂！`;
+              const char = CHARACTERS_MAP[characterId] || CHARACTERS_MAP.minnie;
+              const subject = `🎟️ ${char.shortName}通知開賣：東京迪士尼【${targetDate}】早鳥特惠已開放預訂！`;
               const html = buildTicketOpenEmailHtml(store, targetDate, parkName, undefined, characterId);
               const resMail = await sendResendEmail({
                 apiKey: store.emailSettings.resendApiKey,
@@ -1419,19 +1738,31 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
               });
               if (resMail.ok) {
                 notifiedEmailCount++;
-                logs.push(`[Email Success] 已自動發送至 ${sub.email}`);
+                sentAnyForSub = true;
+                logs.push(`[Email Success] 已自動發送(${characterId})至 ${sub.email}`);
+              } else {
+                logs.push(`[Email Fail] ${sub.email}: ${resMail.error}`);
               }
             } catch (mailErr: any) {
               logs.push(`[Email Fail] ${sub.email}: ${mailErr?.message}`);
             }
           }
 
-          sub.lastNotifiedAt = new Date().toISOString();
+          if (sentAnyForSub) {
+            sub.lastNotifiedAt = new Date().toISOString();
+          }
         }
       }
 
-      if (matchedCount > 0) {
-        saveStore(store);
+      if (notifiedLineCount > 0 || notifiedEmailCount > 0) {
+        store.emailHistory.unshift({
+          id: `cron-${Date.now()}`,
+          subject: `🤖 自動開賣巡檢 (${todayStr})`,
+          recipientCount: notifiedLineCount + notifiedEmailCount,
+          sentAt: new Date().toISOString(),
+          status: `LINE: ${notifiedLineCount} 人, Email: ${notifiedEmailCount} 封`,
+        });
+        await saveStore(store);
       }
 
       sendJson(res, 200, {
@@ -1441,6 +1772,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         notifiedLineCount,
         notifiedEmailCount,
         logs,
+        storageStatus: lastStorageStatus,
       });
       return true;
     } catch (err: any) {

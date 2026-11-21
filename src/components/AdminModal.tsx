@@ -100,6 +100,8 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [fromName, setFromName] = useState('東京迪士尼降價與人潮預報助手');
   const [hasResendKey, setHasResendKey] = useState(false);
   const [selectedAdminChar, setSelectedAdminChar] = useState<string>('mickey');
+  const [storageStatus, setStorageStatus] = useState<{ mode: string; connected: boolean; provider: string; error?: string } | null>(null);
+  const [lineStatus, setLineStatus] = useState<{ hasToken: boolean; maskedToken?: string; botBasicId?: string; botName?: string } | null>(null);
 
   // 🔒 站長身分安全鎖狀態 (Session 儲存)
   const [adminToken, setAdminToken] = useState<string>(() => {
@@ -299,6 +301,12 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           setResendApiKey(data.emailSettings.resendApiKey || '');
           setFromEmail(data.emailSettings.fromEmail || 'onboarding@resend.dev');
           setFromName(data.emailSettings.fromName || '東京迪士尼降價與人潮預報助手');
+        }
+        if (data.storageStatus) {
+          setStorageStatus(data.storageStatus);
+        }
+        if (data.lineSettings) {
+          setLineStatus(data.lineSettings);
         }
       }
 
@@ -593,7 +601,10 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     try {
       const res = await fetch('/api/admin/send-open-alert', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({ subscriberId, characterId: selectedAdminChar }),
       });
       const data = await res.json();
@@ -616,12 +627,15 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
     try {
       const res = await fetch('/api/admin/send-line-push', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({ subscriberId, characterId: selectedAdminChar }),
       });
       const data = await res.json();
       if (data.ok) {
-        showToast('success', '🎉 已成功透過 LINE Messaging API 發送米妮開賣推播！');
+        showToast('success', data.message || '🎉 已成功透過 LINE Messaging API 發送開賣邀請卡與推播！');
         fetchDashboard();
       } else {
         showToast('error', data.error || 'LINE 推播發送失敗');
@@ -637,7 +651,12 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const handleRunCronCheck = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/cron-check-ticket-open', { method: 'POST' });
+      const res = await fetch('/api/cron-check-ticket-open', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+        },
+      });
       const data = await res.json();
       if (data.ok) {
         showToast('success', `🤖 今日巡檢完成！比對到 ${data.matchedCount} 筆預約，已自動推播 LINE: ${data.notifiedLineCount} 人, Email: ${data.notifiedEmailCount} 人`);
@@ -654,11 +673,18 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
 
   // 刪除訂閱者
   const handleDeleteSubscriber = async (id: string) => {
-    await fetch('/api/admin/subscribers/delete', {
+    const res = await fetch('/api/admin/subscribers/delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`,
+      },
       body: JSON.stringify({ id }),
     });
+    if (!res.ok) {
+      showToast('error', '刪除失敗，請確認登入狀態');
+      return;
+    }
     fetchDashboard();
     onStateUpdated();
   };
@@ -770,6 +796,56 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             )}
             <span>{toastMsg.text}</span>
+          </div>
+        )}
+
+        {/* 資料庫與 LINE 連線狀態指示列 */}
+        {(storageStatus || lineStatus) && (
+          <div className="mx-6 mt-3 flex flex-wrap items-center gap-2 shrink-0 text-xs">
+            {storageStatus && (
+              <div
+                className={`px-3 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 ${
+                  storageStatus.connected && storageStatus.mode === 'redis'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : storageStatus.connected && storageStatus.mode === 'local_file'
+                    ? 'bg-sky-50 text-sky-800 border-sky-200'
+                    : 'bg-rose-50 text-rose-800 border-rose-300'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    storageStatus.connected ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'
+                  }`}
+                ></span>
+                <span>
+                  {storageStatus.connected && storageStatus.mode === 'redis'
+                    ? `🟢 永久資料庫：${storageStatus.provider}`
+                    : storageStatus.connected && storageStatus.mode === 'local_file'
+                    ? `🔵 ${storageStatus.provider}`
+                    : `⚠️ 資料庫警示：${storageStatus.error || '尚未連接 Upstash Redis，名單跨天會遺失！'}`}
+                </span>
+              </div>
+            )}
+            {lineStatus && (
+              <div
+                className={`px-3 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 ${
+                  lineStatus.hasToken
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-rose-50 text-rose-800 border-rose-300'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    lineStatus.hasToken ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'
+                  }`}
+                ></span>
+                <span>
+                  {lineStatus.hasToken
+                    ? `💬 LINE 推播金鑰：已連線 (${lineStatus.botBasicId || '@272tfkev'})`
+                    : '⚠️ 尚未設定 LINE_CHANNEL_ACCESS_TOKEN（請至 Vercel 環境變數填入）'}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1390,7 +1466,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                     <span>🤖 每日零人工干預 · 自動定時巡檢系統（已上線）</span>
                   </div>
                   <p className="text-emerald-700">
-                    雲端定時排程每日固定自動巡檢，比對到 2 個月前開賣日將自動透過 LINE 官方 API 推播提醒，您無需人工盯盤，絕不漏單。
+                    雲端定時排程每日台灣時間 12:00（13:00 開賣前）自動巡檢，比對到 2 個月前開賣日將自動透過 LINE 官方 API 推送邀請卡與搶票連結，絕不漏單。
                   </p>
                 </div>
                 <button
