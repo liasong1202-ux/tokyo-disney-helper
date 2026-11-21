@@ -2495,10 +2495,10 @@ export default function App() {
                 <span>{currentPark.flag} {currentPark.name} · 王牌熱門設施情報</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <span>🌟 【{currentPark.shortName}迪士尼】必玩熱門設施與排隊攻略</span>
+                <span>🌟 【{currentPark.shortName}迪士尼】必玩熱門項目</span>
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                精選 {currentPark.name} 最受歡迎 TOP 5 遊樂設施，包含平均排隊時長、尊享卡 (DPA) / 快速通關支援與內行人體驗技巧！
+                精選 {currentPark.name} 最受歡迎 TOP 5 熱門必玩項目，包含園區位置、尊享卡 (DPA) / 快速通關支援與內行人體驗技巧！
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -2580,9 +2580,9 @@ export default function App() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1 text-slate-600">
-                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>平均等候: <strong className="text-slate-900 font-extrabold">{ride.avgWait}</strong></span>
+                  <div className="flex items-center gap-1 text-slate-600 font-bold">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>必玩熱門推薦</span>
                   </div>
                   <span className="text-[11px] font-black text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300/60">
                     {ride.fastPass}
