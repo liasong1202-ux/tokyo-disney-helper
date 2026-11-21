@@ -188,11 +188,24 @@ export default function App() {
   // 票種 (成人、中人/學生、兒童)
   const [ticketType, setTicketType] = useState<'adult' | 'junior' | 'child'>('adult');
 
-  // 匯率設定 (日圓預設 0.2058，啟動後自動向後端同步最新國際即時匯率)
+  // 匯率設定 (啟動後自動向後端同步最新國際即時匯率：JPY / HKD / CNY / USD -> TWD)
   const [exchangeRate, setExchangeRate] = useState<number>(0.2058);
+  const [currencyRates, setCurrencyRates] = useState<{ JPY: number; HKD: number; CNY: number; USD: number }>({
+    JPY: 0.2058,
+    HKD: 4.15,
+    CNY: 4.45,
+    USD: 32.5,
+  });
   const [exchangeRateSource, setExchangeRateSource] = useState<string>('國際即時匯率 (自動同步)');
 
-  const activeRate = selectedParkId === 'tokyo' ? exchangeRate : currentPark.defaultRate;
+  const activeRate =
+    selectedParkId === 'tokyo'
+      ? (currencyRates.JPY || exchangeRate)
+      : selectedParkId === 'hongkong'
+      ? (currencyRates.HKD || currentPark.defaultRate)
+      : selectedParkId === 'shanghai'
+      ? (currencyRates.CNY || currentPark.defaultRate)
+      : (currencyRates.USD || currentPark.defaultRate);
 
   // 後端聯盟行銷連結與常駐優惠設定
   const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>(() => {
@@ -345,6 +358,9 @@ export default function App() {
       }
       if (data.exchangeRate && typeof data.exchangeRate.rate === 'number') {
         setExchangeRate(data.exchangeRate.rate);
+        if (data.exchangeRate.rates) {
+          setCurrencyRates((prev) => ({ ...prev, ...data.exchangeRate.rates }));
+        }
         setExchangeRateSource(data.exchangeRate.source || '國際即時匯率');
       }
       if (typeof data.subscriberCount === 'number') {
@@ -381,6 +397,40 @@ export default function App() {
       }).catch(() => {});
     } catch {}
   }, [fetchPublicState, selectedParkId]);
+
+  // 🌤️ 真實連線 Open-Meteo 國際免費氣象 API (抓取未來 16 天園區所在地真實氣溫、降雨機率與風速)
+  const [liveWeatherMap, setLiveWeatherMap] = useState<
+    Record<string, { tempMax: number; tempMin: number; rainProb: number; windSpeed: number }>
+  >({});
+
+  useEffect(() => {
+    const coords: Record<DisneyParkId, { lat: number; lon: number; tz: string }> = {
+      tokyo: { lat: 35.6329, lon: 139.8804, tz: 'Asia/Tokyo' },
+      hongkong: { lat: 22.313, lon: 114.0413, tz: 'Asia/Hong_Kong' },
+      shanghai: { lat: 31.1434, lon: 121.658, tz: 'Asia/Shanghai' },
+      usa: { lat: 33.8121, lon: -117.919, tz: 'America/Los_Angeles' },
+    };
+    const cfg = coords[selectedParkId] || coords.tokyo;
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${cfg.lat}&longitude=${cfg.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&wind_speed_unit=ms&timezone=${encodeURIComponent(cfg.tz)}&forecast_days=16`
+    )
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.daily?.time && Array.isArray(json.daily.time)) {
+          const nextMap: Record<string, { tempMax: number; tempMin: number; rainProb: number; windSpeed: number }> = {};
+          json.daily.time.forEach((dateStr: string, idx: number) => {
+            nextMap[dateStr] = {
+              tempMax: Math.round(json.daily.temperature_2m_max?.[idx] ?? 20),
+              tempMin: Math.round(json.daily.temperature_2m_min?.[idx] ?? 12),
+              rainProb: Math.round(json.daily.precipitation_probability_max?.[idx] ?? 0),
+              windSpeed: Number((json.daily.wind_speed_10m_max?.[idx] ?? 3).toFixed(1)),
+            };
+          });
+          setLiveWeatherMap(nextMap);
+        }
+      })
+      .catch(() => {});
+  }, [selectedParkId]);
 
   // 當月資料 (依當前年份、月份與選定樂園動態生成)
   const monthDays = useMemo(() => {
@@ -2232,254 +2282,169 @@ export default function App() {
               </div>
             </div>
 
-            {/* 人潮進度條 🚦 與設施維修/強風預警 🌬️ */}
+            {/* 🎯 當日購票策略與淡旺季判斷 + 🌤️ 真實氣象與官網公告直達 */}
             <div id="crowd" className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-3">
-              {/* 人潮進度條 */}
+              {/* 左側卡片：當日購票策略與淡旺季判斷 */}
               <div className="lg:col-span-6 bg-slate-50/80 rounded-2xl border border-slate-200 p-5 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 font-bold text-slate-900">
-                    <span className="text-xl">🚦</span>
-                    <span className="text-base">當日人潮預報進度條</span>
+                    <span className="text-xl">🎯</span>
+                    <span className="text-base">當日購票策略與淡旺季判斷</span>
                   </div>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${currentDayData.crowdColor}`}>
-                    {currentDayData.crowdStatus} (指數: {currentDayData.crowdLevel}/100)
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${
+                    currentDayData.tier === 'cheap'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : currentDayData.tier === 'moderate'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {currentDayData.tier === 'cheap'
+                      ? '🟢 淡季平日最省錢'
+                      : currentDayData.tier === 'moderate'
+                      ? '🟡 一般假日 / 適中'
+                      : '🔴 連假 / 旺季高峰'}
                   </span>
                 </div>
 
-                {/* 進度條 */}
-                <div className="space-y-1.5">
-                  <div className="w-full bg-slate-200 h-4 rounded-full overflow-hidden p-0.5">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        currentDayData.crowdLevel < 40
-                          ? 'bg-emerald-500'
-                          : currentDayData.crowdLevel <= 65
-                          ? 'bg-sky-500'
-                          : currentDayData.crowdLevel <= 80
-                          ? 'bg-orange-500'
-                          : 'bg-rose-600'
-                      }`}
-                      style={{ width: `${currentDayData.crowdLevel}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[11px] text-slate-500 font-semibold">
-                    <span>🟢 舒適自在 (0~39)</span>
-                    <span>🟡 適中好逛 (40~65)</span>
-                    <span>🟠 人潮偏多 (66~80)</span>
-                    <span>🔴 極度爆滿 (81~100)</span>
-                  </div>
-                </div>
-
-                {/* 預估排隊時間表 */}
-                <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 space-y-2 text-xs">
-                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-indigo-600" />
-                    <span>當日主力遊樂設施預估排隊時間：</span>
-                  </div>
-                  {selectedParkId === 'tokyo' ? (
-                    selectedPark === 'land' ? (
-                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <div className="text-slate-500">美女與野獸</div>
-                          <div className="text-base font-extrabold text-indigo-700 tabular-nums">
-                            ~{currentDayData.waitTimeLand.beautyAndBeast} 分
-                          </div>
-                        </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <div className="text-slate-500">太空山</div>
-                          <div className="text-base font-extrabold text-slate-800 tabular-nums">
-                            ~{currentDayData.waitTimeLand.spaceMountain} 分
-                          </div>
-                        </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <div className="text-slate-500">飛濺山</div>
-                          <div className="text-base font-extrabold text-slate-800 tabular-nums">
-                            ~{currentDayData.waitTimeLand.splashMountain} 分
-                          </div>
-                        </div>
-                      </div>
+                {/* 開賣狀態與建議搶票時機 */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200/80 space-y-2.5 text-xs">
+                  <div className="font-bold text-slate-800 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-indigo-600" />
+                      <span>當日門票開賣狀態</span>
+                    </span>
+                    {currentDayData.bookingStatus === 'available' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold">
+                        ✅ 已開放預訂
+                      </span>
                     ) : (
-                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <div className="text-slate-500">夢幻泉鄉·冰雪</div>
-                          <div className="text-base font-extrabold text-indigo-700 tabular-nums">
-                            ~{currentDayData.waitTimeSea.frozenJourney} 分
-                          </div>
-                        </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <div className="text-slate-500">翱翔：夢幻奇航</div>
-                          <div className="text-base font-extrabold text-slate-800 tabular-nums">
-                            ~{currentDayData.waitTimeSea.soaring} 分
-                          </div>
-                        </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <div className="text-slate-500">驚魂古塔</div>
-                          <div className="text-base font-extrabold text-slate-800 tabular-nums">
-                            ~{currentDayData.waitTimeSea.towerOfTerror} 分
-                          </div>
-                        </div>
-                      </div>
-                    )
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-extrabold">
+                        ⏳ 尚未開賣
+                      </span>
+                    )}
+                  </div>
+
+                  {currentDayData.bookingStatus === 'available' ? (
+                    <p className="text-slate-600 leading-relaxed">
+                      <strong>{currentDayData.date}</strong> 目前已正式開賣！建議直接點上方 <strong>Klook / KKday</strong> 按鈕比價下單，可省去官網日圓刷卡 1.5% 海外手續費。
+                    </p>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                      {selectedParkId === 'hongkong' && selectedSubParkIndex === 1 ? (
-                        <>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="魔雪奇幻之旅">魔雪奇幻之旅</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~60~100 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="雪嶺滑雪橇">雪嶺滑雪橇</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~50~90 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="森林小天地慶典">森林小天地</div>
-                            <div className="text-base font-extrabold text-slate-800 tabular-nums">~20~35 分</div>
-                          </div>
-                        </>
-                      ) : selectedParkId === 'shanghai' && selectedSubParkIndex === 1 ? (
-                        <>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="瘋狂動物城：熱力追蹤">熱力追蹤</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~70~120 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="爪爪棒冰與大象甜品">爪爪棒冰甜品</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~15~30 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="動物城警局互動">警局巡邏互動</div>
-                            <div className="text-base font-extrabold text-slate-800 tabular-nums">~25~45 分</div>
-                          </div>
-                        </>
-                      ) : selectedParkId === 'usa' && selectedSubParkIndex === 1 ? (
-                        <>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="水車鎮賽車">水車鎮賽車</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~70~110 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="蛛絲發射冒險">蜘蛛人冒險</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~60~90 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="飆速雲霄飛車">皮克斯過山車</div>
-                            <div className="text-base font-extrabold text-slate-800 tabular-nums">~50~80 分</div>
-                          </div>
-                        </>
-                      ) : selectedParkId === 'usa' && selectedSubParkIndex === 2 ? (
-                        <>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="阿凡達：飛行之旅">阿凡達飛行</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~100~160 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="星際異攻隊">重返宇宙過山車</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">~80~140 分</div>
-                          </div>
-                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title="七個小矮人礦車">小矮人礦車</div>
-                            <div className="text-base font-extrabold text-slate-800 tabular-nums">~70~110 分</div>
-                          </div>
-                        </>
-                      ) : (
-                        currentPark.topRides.slice(0, 3).map((r, i) => (
-                          <div key={i} className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <div className="text-slate-500 truncate" title={r.name}>{r.name}</div>
-                            <div className="text-base font-extrabold text-indigo-700 tabular-nums">
-                              {r.avgWait}
-                            </div>
-                          </div>
-                        ))
-                      )}
+                    <div className="space-y-1.5">
+                      <p className="text-slate-600 leading-relaxed">
+                        <strong>{currentDayData.date}</strong> 將於入園前 2 個月（預計 <strong className="text-indigo-700">{currentDayData.saleOpenDate} 台灣時間 13:00</strong>）準時開賣。
+                      </p>
+                      <p className="text-amber-700 font-bold">
+                        💡 建議先設定上方的「LINE 免費開賣提醒」，開賣當天我們會自動推播通知您搶第一波票！
+                      </p>
                     </div>
                   )}
                 </div>
 
-                {/* 快速通關建議 */}
-                <div className="text-xs text-slate-600 bg-indigo-50/70 p-3 rounded-xl border border-indigo-100 flex items-start gap-2">
+                {/* 淡旺季省錢與通關建議 */}
+                <div className="text-xs text-slate-600 bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-100 flex items-start gap-2.5">
                   <Compass className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-indigo-900">入園通關建議：</strong>
-                    {selectedParkId === 'tokyo' ? (
-                      currentDayData.crowdLevel < 40
-                        ? '今日人潮少，可先直衝熱門項目，免額外課金購買 DPA 也能玩得非常盡興！'
-                        : currentDayData.crowdLevel <= 70
-                        ? '建議開園前 40 分鐘抵達現場排隊入閘，一入園立即抽免費 Priority Pass 即可省下大把時間。'
-                        : '極度擁擠警戒！強烈建議入園第一分鐘立刻課金購買【美女與野獸 / 夢幻泉鄉】DPA 尊享卡，否則下午排隊動輒 120 分鐘以上。'
-                    ) : (
-                      `造訪【${currentPark.name}】建議優先下載官方 App 綁定門票。開園第一時間衝刺「${currentPark.topRides[0].name}」或加購快速尊享通關，避開中午後的大排長龍！`
-                    )}
+                  <div className="leading-relaxed">
+                    <strong className="text-indigo-900">入園購票建議：</strong>
+                    {currentDayData.tier === 'cheap'
+                      ? '此日屬於淡季平日票價區間，通常入園人潮較少、門票價格最划算！不需額外花錢加購 DPA 尊享卡也能玩得非常盡興。'
+                      : currentDayData.tier === 'moderate'
+                      ? '此日屬於一般週末或中等價位區間，建議提早鎖定早鳥票券，並於開園前抵達現場抽取免費優先入場卡 (PP)。'
+                      : '此日屬於連假或超級旺季高峰，熱門時段極易售罄！強烈建議開賣當天 13:00 準時透過 Klook / KKday 購票鎖定入園資格。'}
                   </div>
                 </div>
               </div>
 
-              {/* 設施維修與強風預警 */}
+              {/* 右側卡片：即時園區天氣預報 (16天內) ＋ 官方設施公告直達 */}
               <div id="wind-maintenance" className="lg:col-span-6 bg-slate-50/80 rounded-2xl border border-slate-200 p-5 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 font-bold text-slate-900">
-                    <span className="text-xl">🌬️</span>
-                    <span className="text-base">海灣強風與休止設施維修預警</span>
+                    <span className="text-xl">🌤️</span>
+                    <span className="text-base">園區即時天氣預報與官方公告</span>
                   </div>
+                  {liveWeatherMap[currentDayData.date] && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      🟢 Open-Meteo 即時預報
+                    </span>
+                  )}
                 </div>
 
-                {/* 強風預警評估卡 */}
-                <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <Wind className="w-4 h-4 text-sky-600" />
-                      <span>戶外遊行海風指數預測：</span>
-                    </span>
-                    <span className="font-bold text-slate-900 tabular-nums">
-                      預估風速 {currentDayData.weather.windSpeed} m/s
-                    </span>
-                  </div>
-
-                  <div className={`p-2.5 rounded-lg text-xs font-medium border ${
-                    currentDayData.weather.windSpeed > 8.0
-                      ? 'bg-rose-50 text-rose-800 border-rose-200'
-                      : currentDayData.weather.windSpeed > 5.5
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  }`}>
-                    {currentDayData.weather.windAlert}
-                  </div>
-
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    * 迪士尼樂園座落於東京灣岸，當海風風速超過 8.0 m/s 時，夜間水上表演、高空花車巡遊與煙火（Sky Full of Colors）將可能臨時變更或取消。
-                  </p>
-                </div>
-
-                {/* 當日設施保養停運清單 */}
-                <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 space-y-2.5">
-                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                    <Wrench className="w-4 h-4 text-amber-600" />
-                    <span>當日園區休止保養設施清單：</span>
-                  </div>
-
-                  {dayMaintenanceList.length > 0 ? (
-                    <div className="space-y-2">
-                      {dayMaintenanceList.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg text-xs space-y-0.5"
-                        >
-                          <div className="font-bold text-amber-900 flex items-center justify-between">
-                            <span>{item.name}</span>
-                            <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-mono">
-                              {item.startDate} ~ {item.endDate}
-                            </span>
+                {/* 真實氣象預報卡片 */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200/80 space-y-2.5">
+                  {liveWeatherMap[currentDayData.date] ? (
+                    <>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                          <Wind className="w-4 h-4 text-sky-600" />
+                          <span>{currentPark.shortName}園區當日即時預報 ({currentDayData.date})</span>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <div className="text-[11px] text-slate-500">氣溫範圍</div>
+                          <div className="text-sm font-black text-slate-900 tabular-nums">
+                            {liveWeatherMap[currentDayData.date].tempMin}° ~ {liveWeatherMap[currentDayData.date].tempMax}°C
                           </div>
-                          {item.note && <p className="text-amber-800 text-[11px]">{item.note}</p>}
                         </div>
-                      ))}
-                    </div>
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <div className="text-[11px] text-slate-500">降雨機率</div>
+                          <div className="text-sm font-black text-sky-700 tabular-nums">
+                            {liveWeatherMap[currentDayData.date].rainProb}%
+                          </div>
+                        </div>
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <div className="text-[11px] text-slate-500">預估風速</div>
+                          <div className={`text-sm font-black tabular-nums ${
+                            liveWeatherMap[currentDayData.date].windSpeed > 8.0 ? 'text-rose-600' : 'text-emerald-700'
+                          }`}>
+                            {liveWeatherMap[currentDayData.date].windSpeed} m/s
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        {liveWeatherMap[currentDayData.date].windSpeed > 8.0
+                          ? '⚠️ 注意：預報風速超過 8.0 m/s，海灣夜間煙火與戶外高空遊行可能臨時受影響。'
+                          : '✅ 風速平穩，適合戶外遊行與夜間煙火觀賞。'}
+                      </p>
+                    </>
                   ) : (
-                    <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>今日無重大熱門遊樂設施排定休止，所有主力設施皆預計正常運作！</span>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <Wind className="w-4 h-4 text-sky-600" />
+                        <span>園區真實天氣與海風預報</span>
+                      </div>
+                      <p className="text-slate-600 leading-relaxed">
+                        國際氣象預報 API（Open-Meteo）僅提供<strong>未來 16 天內</strong>的精準氣象與風速。您選取的 <strong>{currentDayData.date}</strong> 尚未進入 16 天預報窗口，建議出發前兩週回來點選日期即可查看真實氣溫與降雨機率！
+                      </p>
                     </div>
                   )}
+                </div>
+
+                {/* 官方最新休止維修設施直達按鈕 */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200/80 space-y-2.5">
+                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <Wrench className="w-4 h-4 text-amber-600" />
+                    <span>當日設施維修與營運時間查詢</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    為確保資訊 100% 準確不延遲，休止保養與維修設施清單請以迪士尼官方最新公告為準：
+                  </p>
+                  <a
+                    href={
+                      selectedParkId === 'tokyo'
+                        ? 'https://www.tokyodisneyresort.jp/tc/tdl/monthly/stop.html'
+                        : selectedParkId === 'hongkong'
+                        ? 'https://www.hongkongdisneyland.com/zh-hk/calendars/day/'
+                        : selectedParkId === 'shanghai'
+                        ? 'https://www.shanghaidisneyresort.com/calendars/day/'
+                        : 'https://disneyland.disney.go.com/calendars/day/'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all"
+                  >
+                    <span>🔧 前往{currentPark.shortName}迪士尼官網確認維修設施</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
               </div>
             </div>
