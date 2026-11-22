@@ -731,12 +731,25 @@ export default function App() {
       }),
     }).catch(() => {});
 
+    const isUsaOrlando = selectedParkId === 'usa' && selectedSubParkIndex === 2;
     let targetUrl =
       platform === 'Klook'
-        ? (selectedParkId === 'tokyo' ? affiliateConfig.klookUrl : currentPark.klookUrl)
+        ? selectedParkId === 'tokyo'
+          ? affiliateConfig.klookUrl
+          : isUsaOrlando
+          ? 'https://www.klook.com/zh-TW/activity/71777-walt-disney-world-resort-orlando/'
+          : currentPark.klookUrl
         : platform === 'KKday'
-        ? (selectedParkId === 'tokyo' ? affiliateConfig.kkdayUrl : currentPark.kkdayUrl)
-        : (selectedParkId === 'tokyo' ? affiliateConfig.officialUrl : currentPark.officialUrl);
+        ? selectedParkId === 'tokyo'
+          ? affiliateConfig.kkdayUrl
+          : isUsaOrlando
+          ? 'https://www.kkday.com/zh-tw/product/productlist?keyword=%E5%A5%A7%E8%98%AD%E5%A4%9A%E8%BF%AA%E5%A3%AB%E5%B0%BC'
+          : currentPark.kkdayUrl
+        : selectedParkId === 'tokyo'
+        ? affiliateConfig.officialUrl
+        : isUsaOrlando
+        ? 'https://disneyworld.disney.go.com/tickets/'
+        : currentPark.officialUrl;
 
     // 自動附加 Klook (AID) 與 KKday (CID) 專屬分潤追蹤碼，確保全球各樂園均能累積收益
     if (platform === 'Klook') {
@@ -2245,6 +2258,40 @@ export default function App() {
                 <span className="text-xs text-slate-500">以 {ticketType === 'adult' ? '成人票' : ticketType === 'junior' ? '學生票' : '兒童票'} 換算</span>
               </div>
 
+              {/* 🇺🇸 美國專屬雙度假區分票切換器：加州 vs 佛羅里達奧蘭多 */}
+              {selectedParkId === 'usa' && (
+                <div className="bg-slate-50 p-3 rounded-2xl border-2 border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                    <span>🇺🇸</span>
+                    <span>請先選擇您要購票的美國園區（兩地門票系統與價格獨立分開）：</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSubParkIndex(0)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                        selectedSubParkIndex !== 2
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      🌴 加州迪士尼 (California)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSubParkIndex(2)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                        selectedSubParkIndex === 2
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      🌐 佛羅里達奧蘭多 (Disney World)
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {/* 1. Klook 客路 */}
                 <div className="border-2 border-orange-400 bg-gradient-to-b from-orange-50/50 to-white rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow relative overflow-hidden">
@@ -2390,7 +2437,7 @@ export default function App() {
                     onClick={() => handleAffiliateClick('Official')}
                     className="mt-6 w-full py-3 px-4 bg-slate-800 hover:bg-slate-900 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                   >
-                    <span>開啟【{currentPark.shortName}迪士尼】官方購票</span>
+                    <span>開啟【{selectedParkId === 'usa' ? (selectedSubParkIndex === 2 ? '佛羅里達奧蘭多迪士尼' : '加州迪士尼') : `${currentPark.shortName}迪士尼`}】官方購票</span>
                     <ExternalLink className="w-3.5 h-3.5 opacity-80" />
                   </button>
                 </div>
