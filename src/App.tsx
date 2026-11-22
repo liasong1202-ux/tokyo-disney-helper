@@ -772,6 +772,44 @@ export default function App() {
     }
   };
 
+  // 取得含聯盟行銷代碼的熱門交通/網卡/景點快速分類連結
+  const getParkQuickCategories = () => {
+    const aidMatch = (affiliateConfig.klookUrl || '').match(/aid=([0-9a-zA-Z_-]+)/);
+    const activeAid = aidMatch ? aidMatch[1] : '144150';
+    const items =
+      selectedParkId === 'tokyo'
+        ? [
+            { icon: '🚄', label: '機場快線 / 接送', query: '東京機場交通' },
+            { icon: '📶', label: '日本高速 eSIM', query: '日本 eSIM' },
+            { icon: '🗼', label: '晴空塔 / 澀谷展望台', query: '東京晴空塔 SHIBUYA SKY' },
+            { icon: '🗻', label: '富士山一日遊', query: '富士山一日遊' },
+          ]
+        : selectedParkId === 'hongkong'
+        ? [
+            { icon: '🚄', label: '香港機場快線', query: '香港機場快線' },
+            { icon: '📶', label: '港澳高速 eSIM', query: '香港 eSIM' },
+            { icon: '🚡', label: '太平山頂纜車', query: '太平山頂纜車' },
+            { icon: '🎡', label: '昂坪 360 / 維港遊', query: '昂坪360' },
+          ]
+        : selectedParkId === 'shanghai'
+        ? [
+            { icon: '🚄', label: '浦東機場接送 / 磁浮', query: '上海機場接送' },
+            { icon: '📶', label: '中港澳免翻牆網卡', query: '中國 eSIM' },
+            { icon: '🏙️', label: '東方明珠 / 黃浦江', query: '上海東方明珠' },
+            { icon: '🏮', label: '朱家角 / 蘇杭一日遊', query: '上海一日遊' },
+          ]
+        : [
+            { icon: '🎬', label: '好萊塢環球影城', query: '好萊塢環球影城' },
+            { icon: '📶', label: '美國高速 eSIM', query: '美國 eSIM' },
+            { icon: '🚌', label: '洛杉磯機場接送', query: '洛杉磯機場接送' },
+            { icon: '🌴', label: '加州城市觀光通票', query: '洛杉磯景點通票' },
+          ];
+    return items.map((item) => ({
+      ...item,
+      url: `https://www.klook.com/zh-TW/search/result/?query=${encodeURIComponent(item.query)}&aid=${activeAid}`,
+    }));
+  };
+
   // 模擬平台突發促銷特惠觸發
   const handleSimulatePromo = () => {
     if (promoState && promoState.active) {
@@ -2225,27 +2263,15 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="mt-6 space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAffiliateClick('Klook')}
-                      className="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                      <span>前往 Klook 購票</span>
-                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-                    </button>
-                    <a
-                      href={getCityExploreUrl('Klook')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => trackGaEvent('explore_more_click', { platform: 'Klook_card', park: selectedParkId })}
-                      className="w-full py-2 px-3 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <span>逛逛當地其他交通與熱門體驗</span>
-                      <ExternalLink className="w-3 h-3 opacity-80" />
-                    </a>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAffiliateClick('Klook')}
+                    className="mt-6 w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    <span>前往 Klook 購票</span>
+                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                  </button>
                 </div>
 
                 {/* 2. KKday */}
@@ -2289,27 +2315,15 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="mt-6 space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAffiliateClick('KKday')}
-                      className="w-full py-3 px-4 bg-sky-600 hover:bg-sky-700 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                      <span>前往 KKday 購票</span>
-                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-                    </button>
-                    <a
-                      href={getCityExploreUrl('KKday')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => trackGaEvent('explore_more_click', { platform: 'KKday_card', park: selectedParkId })}
-                      className="w-full py-2 px-3 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <span>逛逛當地其他交通與熱門體驗</span>
-                      <ExternalLink className="w-3 h-3 opacity-80" />
-                    </a>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAffiliateClick('KKday')}
+                    className="mt-6 w-full py-3 px-4 bg-sky-600 hover:bg-sky-700 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    <span>前往 KKday 購票</span>
+                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                  </button>
                 </div>
 
                 {/* 3. 官方網站 */}
@@ -2378,6 +2392,27 @@ export default function App() {
                     出發前一次備齊交通與網卡最省事，可搭配平台當期優惠券一併結帳！
                   </p>
                 </div>
+
+                {/* 4 個具體品類快速入口（含聯盟分潤代碼） */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  {getParkQuickCategories().map((cat) => (
+                    <a
+                      key={cat.label}
+                      href={cat.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackGaEvent('explore_category_click', { category: cat.label, park: selectedParkId })}
+                      className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/18 border border-white/15 text-xs font-bold text-white transition-all"
+                    >
+                      <span className="truncate flex items-center gap-1.5">
+                        <span>{cat.icon}</span>
+                        <span className="truncate">{cat.label}</span>
+                      </span>
+                      <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
+                    </a>
+                  ))}
+                </div>
+
                 <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
                   <a
                     href={getCityExploreUrl('Klook')}
