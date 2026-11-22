@@ -737,13 +737,13 @@ export default function App() {
         ? selectedParkId === 'tokyo'
           ? affiliateConfig.klookUrl
           : isUsaOrlando
-          ? 'https://www.klook.com/zh-TW/search/result/?query=%E5%A5%A7%E8%98%AD%E5%A4%9A%E8%BF%AA%E5%A3%AB%E5%B0%BC%E4%B8%96%E7%95%8C%E9%96%80%E7%A5%A8'
+          ? 'https://www.klook.com/zh-TW/activity/4749-walt-disney-world-orlando/'
           : currentPark.klookUrl
         : platform === 'KKday'
         ? selectedParkId === 'tokyo'
           ? affiliateConfig.kkdayUrl
           : isUsaOrlando
-          ? 'https://www.kkday.com/zh-tw/product/productlist?keyword=%E5%A5%A7%E8%98%AD%E5%A4%9A%E8%BF%AA%E5%A3%AB%E5%B0%BC'
+          ? 'https://www.kkday.com/zh-tw/product/13885-walt-disney-world-resort-admission-ticket'
           : currentPark.kkdayUrl
         : selectedParkId === 'tokyo'
         ? affiliateConfig.officialUrl
