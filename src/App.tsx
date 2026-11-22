@@ -737,7 +737,7 @@ export default function App() {
         ? selectedParkId === 'tokyo'
           ? affiliateConfig.klookUrl
           : isUsaOrlando
-          ? 'https://www.klook.com/zh-TW/activity/71777-walt-disney-world-resort-orlando/'
+          ? 'https://www.klook.com/zh-TW/search/result/?query=%E5%A5%A7%E8%98%AD%E5%A4%9A%E8%BF%AA%E5%A3%AB%E5%B0%BC%E4%B8%96%E7%95%8C%E9%96%80%E7%A5%A8'
           : currentPark.klookUrl
         : platform === 'KKday'
         ? selectedParkId === 'tokyo'
