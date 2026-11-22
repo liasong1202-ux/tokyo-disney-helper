@@ -760,54 +760,47 @@ export default function App() {
     } else {
       const cidMatch = (affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
       const activeCid = cidMatch ? cidMatch[1] : '28178';
-      const citySlug =
+      const destSlug =
         selectedParkId === 'tokyo'
-          ? 'tokyo'
+          ? 'jp-tokyo'
           : selectedParkId === 'hongkong'
-          ? 'hong-kong'
+          ? 'hk-hong-kong'
           : selectedParkId === 'shanghai'
-          ? 'shanghai'
-          : 'los-angeles';
-      return `https://www.kkday.com/zh-tw/city/${citySlug}?cid=${activeCid}&ud1=disney_helper`;
+          ? 'cn-shanghai'
+          : 'us-los-angeles';
+      return `https://www.kkday.com/zh-tw/destination/${destSlug}?cid=${activeCid}&ud3=prodcard&ud4=recommend`;
     }
   };
 
-  // 取得含聯盟行銷代碼的熱門交通/網卡/景點快速分類連結
+  // 取得當地熱門交通/網卡/景點展示項目（純文字標籤）
   const getParkQuickCategories = () => {
-    const aidMatch = (affiliateConfig.klookUrl || '').match(/aid=([0-9a-zA-Z_-]+)/);
-    const activeAid = aidMatch ? aidMatch[1] : '144150';
-    const items =
-      selectedParkId === 'tokyo'
-        ? [
-            { icon: '🚄', label: '機場快線 / 接送', query: '東京機場交通' },
-            { icon: '📶', label: '日本高速 eSIM', query: '日本 eSIM' },
-            { icon: '🗼', label: '晴空塔 / 澀谷展望台', query: '東京晴空塔 SHIBUYA SKY' },
-            { icon: '🗻', label: '富士山一日遊', query: '富士山一日遊' },
-          ]
-        : selectedParkId === 'hongkong'
-        ? [
-            { icon: '🚄', label: '香港機場快線', query: '香港機場快線' },
-            { icon: '📶', label: '港澳高速 eSIM', query: '香港 eSIM' },
-            { icon: '🚡', label: '太平山頂纜車', query: '太平山頂纜車' },
-            { icon: '🎡', label: '昂坪 360 / 維港遊', query: '昂坪360' },
-          ]
-        : selectedParkId === 'shanghai'
-        ? [
-            { icon: '🚄', label: '浦東機場接送 / 磁浮', query: '上海機場接送' },
-            { icon: '📶', label: '中港澳免翻牆網卡', query: '中國 eSIM' },
-            { icon: '🏙️', label: '東方明珠 / 黃浦江', query: '上海東方明珠' },
-            { icon: '🏮', label: '朱家角 / 蘇杭一日遊', query: '上海一日遊' },
-          ]
-        : [
-            { icon: '🎬', label: '好萊塢環球影城', query: '好萊塢環球影城' },
-            { icon: '📶', label: '美國高速 eSIM', query: '美國 eSIM' },
-            { icon: '🚌', label: '洛杉磯機場接送', query: '洛杉磯機場接送' },
-            { icon: '🌴', label: '加州城市觀光通票', query: '洛杉磯景點通票' },
-          ];
-    return items.map((item) => ({
-      ...item,
-      url: `https://www.klook.com/zh-TW/search/result/?query=${encodeURIComponent(item.query)}&aid=${activeAid}`,
-    }));
+    return selectedParkId === 'tokyo'
+      ? [
+          { icon: '🚄', label: '機場快線 / 接送' },
+          { icon: '📶', label: '日本高速 eSIM' },
+          { icon: '🗼', label: '晴空塔 / 澀谷展望台' },
+          { icon: '🗻', label: '富士山一日遊' },
+        ]
+      : selectedParkId === 'hongkong'
+      ? [
+          { icon: '🚄', label: '香港機場快線' },
+          { icon: '📶', label: '港澳高速 eSIM' },
+          { icon: '🚡', label: '太平山頂纜車' },
+          { icon: '🎡', label: '昂坪 360 / 維港遊' },
+        ]
+      : selectedParkId === 'shanghai'
+      ? [
+          { icon: '🚄', label: '浦東機場接送 / 磁浮' },
+          { icon: '📶', label: '中港澳免翻牆網卡' },
+          { icon: '🏙️', label: '東方明珠 / 黃浦江' },
+          { icon: '🏮', label: '朱家角 / 蘇杭一日遊' },
+        ]
+      : [
+          { icon: '🎬', label: '好萊塢環球影城' },
+          { icon: '📶', label: '美國高速 eSIM' },
+          { icon: '🚌', label: '洛杉磯機場接送' },
+          { icon: '🌴', label: '加州城市觀光通票' },
+        ];
   };
 
   // 模擬平台突發促銷特惠觸發
@@ -2393,23 +2386,16 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* 4 個具體品類快速入口（含聯盟分潤代碼） */}
+                {/* 4 個具體品類純文字標籤 */}
                 <div className="grid grid-cols-2 gap-2.5">
                   {getParkQuickCategories().map((cat) => (
-                    <a
+                    <div
                       key={cat.label}
-                      href={cat.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => trackGaEvent('explore_category_click', { category: cat.label, park: selectedParkId })}
-                      className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/18 border border-white/15 text-xs font-bold text-white transition-all"
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/15 text-xs font-bold text-slate-100 select-none"
                     >
-                      <span className="truncate flex items-center gap-1.5">
-                        <span>{cat.icon}</span>
-                        <span className="truncate">{cat.label}</span>
-                      </span>
-                      <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
-                    </a>
+                      <span>{cat.icon}</span>
+                      <span className="truncate">{cat.label}</span>
+                    </div>
                   ))}
                 </div>
 
