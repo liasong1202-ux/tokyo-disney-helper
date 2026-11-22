@@ -79,7 +79,9 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [officialUrl, setOfficialUrl] = useState('https://www.tokyodisneyresort.jp/tc/ticket/');
   const [klookDefaultCode, setKlookDefaultCode] = useState('');
   const [klookDefaultDesc, setKlookDefaultDesc] = useState('');
+  const [klookCornerBadge, setKlookCornerBadge] = useState('推薦折扣首選');
   const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('購票即享日本高速 eSIM 1GB 體驗組');
+  const [kkdayCornerBadge, setKkdayCornerBadge] = useState('加贈方案');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('https://lin.ee/XnkEyyl');
   const [gaMeasurementId, setGaMeasurementId] = useState('G-BZBLXPCSDF');
   const [klookFeatures, setKlookFeatures] = useState<string[]>(defaultKlookFeatures);
@@ -335,7 +337,13 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           setOfficialUrl(data.affiliateConfig.officialUrl || 'https://www.tokyodisneyresort.jp/tc/ticket/');
           setKlookDefaultCode(data.affiliateConfig.klookDefaultCode || '');
           setKlookDefaultDesc(data.affiliateConfig.klookDefaultDesc || '');
+          if (data.affiliateConfig.klookCornerBadge !== undefined) {
+            setKlookCornerBadge(data.affiliateConfig.klookCornerBadge);
+          }
           setKkdayDefaultBonus(data.affiliateConfig.kkdayDefaultBonus || '購票即享日本高速 eSIM 1GB 體驗組');
+          if (data.affiliateConfig.kkdayCornerBadge !== undefined) {
+            setKkdayCornerBadge(data.affiliateConfig.kkdayCornerBadge);
+          }
           setLineOfficialUrl(data.affiliateConfig.lineOfficialUrl && data.affiliateConfig.lineOfficialUrl.trim() ? data.affiliateConfig.lineOfficialUrl.trim() : 'https://lin.ee/XnkEyyl');
           if (data.affiliateConfig.gaMeasurementId) {
             setGaMeasurementId(data.affiliateConfig.gaMeasurementId);
@@ -391,7 +399,9 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           if (aff.officialUrl) setOfficialUrl(aff.officialUrl);
           if (aff.klookDefaultCode !== undefined) setKlookDefaultCode(aff.klookDefaultCode);
           if (aff.klookDefaultDesc !== undefined) setKlookDefaultDesc(aff.klookDefaultDesc);
+          if (aff.klookCornerBadge !== undefined) setKlookCornerBadge(aff.klookCornerBadge);
           if (aff.kkdayDefaultBonus !== undefined) setKkdayDefaultBonus(aff.kkdayDefaultBonus);
+          if (aff.kkdayCornerBadge !== undefined) setKkdayCornerBadge(aff.kkdayCornerBadge);
           if (aff.lineOfficialUrl && aff.lineOfficialUrl.trim()) {
             setLineOfficialUrl(aff.lineOfficialUrl.trim());
           } else {
@@ -541,7 +551,9 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
       officialUrl,
       klookDefaultCode,
       klookDefaultDesc,
+      klookCornerBadge: klookCornerBadge.trim(),
       kkdayDefaultBonus,
+      kkdayCornerBadge: kkdayCornerBadge.trim(),
       lineOfficialUrl,
       gaMeasurementId: gaMeasurementId.trim(),
       klookFeatures,
@@ -1242,6 +1254,28 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    🏷️ Klook 卡片右上角標籤（留空即隱藏不顯示）
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={klookCornerBadge}
+                      onChange={(e) => setKlookCornerBadge(e.target.value)}
+                      placeholder="例如：推薦折扣首選 (留空則隱藏)"
+                      className="flex-1 px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setKlookCornerBadge('')}
+                      className="px-3 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl shrink-0 transition-colors"
+                    >
+                      🗑️ 清空隱藏
+                    </button>
+                  </div>
+                </div>
+
                 {/* 綠勾勾賣點清單管理 - Klook */}
                 <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -1356,6 +1390,28 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                     onChange={(e) => setKkdayDefaultBonus(e.target.value)}
                     className="w-full px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    🏷️ KKday 卡片右上角標籤（留空即隱藏不顯示）
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={kkdayCornerBadge}
+                      onChange={(e) => setKkdayCornerBadge(e.target.value)}
+                      placeholder="例如：加贈方案 (留空則隱藏)"
+                      className="flex-1 px-3.5 py-2 text-xs sm:text-sm border border-slate-300 rounded-xl"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setKkdayCornerBadge('')}
+                      className="px-3 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl shrink-0 transition-colors"
+                    >
+                      🗑️ 清空隱藏
+                    </button>
+                  </div>
                 </div>
 
                 {/* 綠勾勾賣點清單管理 - KKday */}

@@ -102,7 +102,9 @@ interface AffiliateConfig {
   officialUrl: string;
   klookDefaultCode?: string;
   klookDefaultDesc?: string;
+  klookCornerBadge?: string;
   kkdayDefaultBonus?: string;
+  kkdayCornerBadge?: string;
   lineOfficialUrl?: string;
   klookFeatures?: string[];
   kkdayFeatures?: string[];
@@ -215,7 +217,9 @@ export default function App() {
       officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
       klookDefaultCode: '',
       klookDefaultDesc: '',
+      klookCornerBadge: '推薦折扣首選',
       kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
+      kkdayCornerBadge: '加贈方案',
       lineOfficialUrl: 'https://lin.ee/XnkEyyl',
       klookFeatures: defaultKlookFeatures,
       kkdayFeatures: defaultKkdayFeatures,
@@ -2151,9 +2155,19 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {/* 1. Klook 客路 */}
                 <div className="border-2 border-orange-400 bg-gradient-to-b from-orange-50/50 to-white rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-orange-500 text-white text-[11px] font-bold px-3 py-1 rounded-bl-xl">
-                    {promoState && promoState.platform === 'Klook' ? '🔥 快閃特惠生效中' : '推薦折扣首選'}
-                  </div>
+                  {(() => {
+                    const klookBadge =
+                      promoState && promoState.platform === 'Klook'
+                        ? '🔥 快閃特惠生效中'
+                        : affiliateConfig.klookCornerBadge !== undefined
+                          ? affiliateConfig.klookCornerBadge.trim()
+                          : '推薦折扣首選';
+                    return klookBadge ? (
+                      <div className="absolute top-0 right-0 bg-orange-500 text-white text-[11px] font-bold px-3 py-1 rounded-bl-xl">
+                        {klookBadge}
+                      </div>
+                    ) : null;
+                  })()}
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xl font-black text-orange-600 tracking-tight">Klook 客路</span>
@@ -2195,9 +2209,17 @@ export default function App() {
 
                 {/* 2. KKday */}
                 <div className="border border-sky-300 bg-gradient-to-b from-sky-50/50 to-white rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-sky-600 text-white text-[11px] font-bold px-3 py-1 rounded-bl-xl">
-                    加贈方案
-                  </div>
+                  {(() => {
+                    const kkdayBadge =
+                      affiliateConfig.kkdayCornerBadge !== undefined
+                        ? affiliateConfig.kkdayCornerBadge.trim()
+                        : '加贈方案';
+                    return kkdayBadge ? (
+                      <div className="absolute top-0 right-0 bg-sky-600 text-white text-[11px] font-bold px-3 py-1 rounded-bl-xl">
+                        {kkdayBadge}
+                      </div>
+                    ) : null;
+                  })()}
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xl font-black text-sky-700 tracking-tight">KKday</span>

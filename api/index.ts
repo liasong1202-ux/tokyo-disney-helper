@@ -275,6 +275,8 @@ export interface AffiliateConfig {
   kkdayDefaultBonus: string;
   lineOfficialUrl?: string; // LINE 官方帳號加好友連結 e.g. https://line.me/R/ti/p/@your_line_id
   gaMeasurementId?: string; // Google Analytics 4 測量 ID (G-XXXXXXXXXX)
+  klookCornerBadge?: string; // Klook 卡片右上角標籤 (留空則不顯示)
+  kkdayCornerBadge?: string; // KKday 卡片右上角標籤 (留空則不顯示)
   klookFeatures?: string[];
   kkdayFeatures?: string[];
 }
@@ -367,6 +369,8 @@ const DEFAULT_STORE: StoreData = {
     kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
     lineOfficialUrl: 'https://lin.ee/XnkEyyl',
     gaMeasurementId: process.env.VITE_GA_MEASUREMENT_ID || process.env.GA_MEASUREMENT_ID || 'G-BZBLXPCSDF',
+    klookCornerBadge: '推薦折扣首選',
+    kkdayCornerBadge: '加贈方案',
     klookFeatures: [
       '累積 Klook 旅遊積分，下次行程預訂可直接折抵現金',
       '支援 LINE Pay / 街口支付，省去 1.5% 海外刷卡手續費',
@@ -1816,6 +1820,14 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         kkdayDefaultBonus: String(body.kkdayDefaultBonus ?? store.affiliateConfig.kkdayDefaultBonus).trim(),
         lineOfficialUrl: String(body.lineOfficialUrl ?? store.affiliateConfig.lineOfficialUrl ?? '').trim(),
         gaMeasurementId: String(body.gaMeasurementId ?? store.affiliateConfig.gaMeasurementId ?? 'G-BZBLXPCSDF').trim(),
+        klookCornerBadge:
+          body.klookCornerBadge !== undefined
+            ? String(body.klookCornerBadge).trim()
+            : (store.affiliateConfig.klookCornerBadge ?? '推薦折扣首選'),
+        kkdayCornerBadge:
+          body.kkdayCornerBadge !== undefined
+            ? String(body.kkdayCornerBadge).trim()
+            : (store.affiliateConfig.kkdayCornerBadge ?? '加贈方案'),
         klookFeatures: Array.isArray(body.klookFeatures) ? body.klookFeatures.map(String) : store.affiliateConfig.klookFeatures,
         kkdayFeatures: Array.isArray(body.kkdayFeatures) ? body.kkdayFeatures.map(String) : store.affiliateConfig.kkdayFeatures,
       };
