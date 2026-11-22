@@ -1415,16 +1415,16 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:h-16 flex flex-wrap items-center justify-between gap-3">
           {/* Zone 1: 品牌標題與全球樂園快速切換器 */}
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3 w-full sm:w-auto">
             <div className="flex items-center gap-2">
-              <span className="text-2xl" role="img" aria-label="castle">🏰</span>
-              <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
+              <span className="text-xl sm:text-2xl" role="img" aria-label="castle">🏰</span>
+              <span className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
                 海外樂園門票情報
               </span>
             </div>
 
             {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs overflow-x-auto max-w-full">
               {PARKS_LIST.map((park) => {
                 const isActive = park.id === selectedParkId;
                 return (
@@ -1432,7 +1432,7 @@ export default function App() {
                     key={park.id}
                     type="button"
                     onClick={() => handleParkSwitch(park.id)}
-                    className={`px-2.5 py-1 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-black rounded-lg transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-xs scale-102'
                         : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
@@ -1788,18 +1788,18 @@ export default function App() {
           </div>
 
           {/* 星期表頭 */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 text-center font-bold text-xs sm:text-sm">
-            <div className="py-2.5 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">週日 (Sun)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週一 (Mon)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週二 (Tue)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週三 (Wed)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週四 (Thu)</div>
-            <div className="py-2.5 bg-slate-100 text-slate-700 rounded-lg">週五 (Fri)</div>
-            <div className="py-2.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">週六 (Sat)</div>
+          <div className="grid grid-cols-7 gap-1 sm:gap-2.5 text-center font-bold text-[11px] sm:text-sm">
+            <div className="py-1.5 sm:py-2.5 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">週日 <span className="hidden sm:inline">(Sun)</span></div>
+            <div className="py-1.5 sm:py-2.5 bg-slate-100 text-slate-700 rounded-lg">週一 <span className="hidden sm:inline">(Mon)</span></div>
+            <div className="py-1.5 sm:py-2.5 bg-slate-100 text-slate-700 rounded-lg">週二 <span className="hidden sm:inline">(Tue)</span></div>
+            <div className="py-1.5 sm:py-2.5 bg-slate-100 text-slate-700 rounded-lg">週三 <span className="hidden sm:inline">(Wed)</span></div>
+            <div className="py-1.5 sm:py-2.5 bg-slate-100 text-slate-700 rounded-lg">週四 <span className="hidden sm:inline">(Thu)</span></div>
+            <div className="py-1.5 sm:py-2.5 bg-slate-100 text-slate-700 rounded-lg">週五 <span className="hidden sm:inline">(Fri)</span></div>
+            <div className="py-1.5 sm:py-2.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">週六 <span className="hidden sm:inline">(Sat)</span></div>
           </div>
 
           {/* 日曆網格 (Grid View) */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2.5">
             {/* 月初前的空白格子 */}
             {Array.from({ length: firstDayWeekday }).map((_, idx) => (
               <div
@@ -1847,45 +1847,45 @@ export default function App() {
                       }, 100);
                     }
                   }}
-                  className={`relative cursor-pointer rounded-xl sm:rounded-2xl p-2 sm:p-3 border-2 flex flex-col justify-between transition-all duration-150 min-h-[92px] sm:min-h-[118px] group ${cardBg} ${flashStyle} ${
+                  className={`relative cursor-pointer rounded-xl sm:rounded-2xl p-1 sm:p-3 border sm:border-2 flex flex-col justify-between transition-all duration-150 min-h-[76px] sm:min-h-[118px] overflow-hidden group ${cardBg} ${flashStyle} ${
                     isSelected
-                      ? 'ring-4 ring-indigo-600 ring-offset-2 shadow-lg z-10 scale-[1.02]'
+                      ? 'ring-2 sm:ring-4 ring-indigo-600 ring-offset-1 sm:ring-offset-2 shadow-lg z-10 sm:scale-[1.02]'
                       : 'hover:shadow-md'
                   }`}
                 >
                   {/* 第一視覺元素：日期與星期 */}
-                  <div className="flex items-start justify-between gap-1">
-                    <div className="flex flex-col">
-                      <span className="text-xs sm:text-sm font-black tracking-tight leading-tight">
-                        {day.month}/{day.day} <span className="text-[11px] font-semibold text-slate-600">{day.weekdayStr}</span>
+                  <div className="flex items-start justify-between gap-0.5 sm:gap-1">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] sm:text-sm font-black tracking-tighter sm:tracking-tight leading-tight whitespace-nowrap">
+                        {day.month}/{day.day} <span className="hidden sm:inline text-[11px] font-semibold text-slate-600">{day.weekdayStr}</span>
                       </span>
                       {day.bookingStatus === 'upcoming' ? (
-                        <div className="flex flex-col gap-0.5 mt-1">
-                          <span className="text-[10px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded inline-block w-fit leading-none">
+                        <div className="flex flex-col gap-0.5 mt-0.5 sm:mt-1">
+                          <span className="text-[8px] sm:text-[10px] bg-indigo-600 text-white font-bold px-1 sm:px-1.5 py-0.5 rounded inline-block w-fit max-w-full truncate leading-none">
                             ⏳ {day.saleOpenLabel}
                           </span>
-                          <span className="text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-black px-1.5 py-0.5 rounded shadow-2xs inline-block w-fit leading-none">
+                          <span className="hidden sm:inline-block text-[10px] bg-rose-500 hover:bg-rose-600 text-white font-black px-1.5 py-0.5 rounded shadow-2xs w-fit leading-none">
                             🔔 預約開賣
                           </span>
                         </div>
                       ) : day.eventNote ? (
-                        <span className="text-[10px] text-rose-600 font-bold truncate max-w-[70px] sm:max-w-[90px] leading-none mt-0.5">
+                        <span className="hidden sm:inline-block text-[10px] text-rose-600 font-bold truncate max-w-[90px] leading-none mt-0.5">
                           {day.eventNote}
                         </span>
                       ) : null}
                     </div>
 
-                    {/* 第三視覺元素：價格等級標籤 */}
+                    {/* 第三視覺元素：價格等級標籤 (手機版由底色呈現，桌機顯示完整文字標籤) */}
                     <span
-                      className={`text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap leading-none ${badgeColor}`}
+                      className={`hidden sm:inline-block text-xs font-bold px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap leading-none ${badgeColor}`}
                     >
                       {day.tierLabel}
                     </span>
                   </div>
 
                   {/* 第二視覺元素：台幣預估價格 (含突發促銷對比) */}
-                  <div className="mt-2 text-right">
-                    <div className="text-[10px] text-slate-500 font-medium">
+                  <div className="mt-1 sm:mt-2 text-right">
+                    <div className="hidden sm:block text-[10px] text-slate-500 font-medium">
                       {day.bookingStatus === 'upcoming' ? (
                         <span className="text-indigo-700 font-bold">預估開賣台幣</span>
                       ) : (
@@ -1893,19 +1893,19 @@ export default function App() {
                       )}
                     </div>
                     {hasPromo && (
-                      <div className="text-[11px] text-slate-400 line-through tabular-nums leading-none">
+                      <div className="text-[9px] sm:text-[11px] text-slate-400 line-through tabular-nums leading-none">
                         ${baseTwd.toLocaleString()}
                       </div>
                     )}
-                    <div className={`text-base sm:text-xl font-extrabold tabular-nums tracking-tight ${priceColor}`}>
+                    <div className={`text-[11px] sm:text-xl font-extrabold tabular-nums tracking-tighter sm:tracking-tight leading-tight ${priceColor}`}>
                       ${finalTwd.toLocaleString()}
                     </div>
                   </div>
 
                   {/* 底部微型人潮指示 */}
-                  <div className="mt-1 pt-1 border-t border-black/5 flex items-center justify-between text-[10px] text-slate-500">
-                    <span className="tabular-nums font-bold">{day.currencySymbol}{ticketPriceVal.toLocaleString()}</span>
-                    <span className="flex items-center gap-1 font-medium">
+                  <div className="mt-0.5 sm:mt-1 pt-0.5 sm:pt-1 border-t border-black/5 flex items-center justify-between text-[8px] sm:text-[10px] text-slate-500">
+                    <span className="tabular-nums font-bold tracking-tighter sm:tracking-normal truncate">{day.currencySymbol}{ticketPriceVal.toLocaleString()}</span>
+                    <span className="flex items-center gap-1 font-medium shrink-0">
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
                           day.crowdLevel < 40 ? 'bg-emerald-500' : day.crowdLevel <= 70 ? 'bg-amber-500' : 'bg-rose-500'
