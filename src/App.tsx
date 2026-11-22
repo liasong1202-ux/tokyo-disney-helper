@@ -2359,73 +2359,46 @@ export default function App() {
 
             {/* 🎯 當日購票策略與淡旺季判斷 + 🌤️ 真實氣象與官網公告直達 */}
             <div id="crowd" className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-3">
-              {/* 左側卡片：當日購票策略與淡旺季判斷 */}
-              <div className="lg:col-span-6 bg-slate-50/80 rounded-2xl border border-slate-200 p-5 space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-bold text-slate-900">
-                    <span className="text-xl">🎯</span>
-                    <span className="text-base">當日購票策略與淡旺季判斷</span>
+              {/* 左側卡片：延伸周邊旅遊體驗與交通票券 */}
+              <div className="lg:col-span-6 bg-gradient-to-br from-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-sm flex flex-col justify-between gap-5">
+                <div className="space-y-2.5">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-amber-300 text-[11px] font-bold">
+                    <span>✈️ 順便規劃行前交通與周邊景點</span>
                   </div>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${
-                    currentDayData.tier === 'cheap'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : currentDayData.tier === 'moderate'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-rose-100 text-rose-800'
-                  }`}>
-                    {currentDayData.tier === 'cheap'
-                      ? '🟢 淡季平日最省錢'
-                      : currentDayData.tier === 'moderate'
-                      ? '🟡 一般假日 / 適中'
-                      : '🔴 連假 / 旺季高峰'}
-                  </span>
+                  <h3 className="text-lg sm:text-xl font-black tracking-tight leading-snug">
+                    {selectedParkId === 'tokyo'
+                      ? '還沒買機場快線、晴空塔、富士山一日遊或日本 eSIM？'
+                      : selectedParkId === 'hongkong'
+                      ? '還沒買香港機場快線、太平山頂纜車、八達通或港澳網卡？'
+                      : selectedParkId === 'shanghai'
+                      ? '還沒買上海外灘觀光、機場接送或中港澳上網卡？'
+                      : '還沒買環球影城、美國網卡或加州城市觀光通票？'}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    出發前一次備齊交通與網卡最省事，可搭配平台當期優惠券一併結帳！
+                  </p>
                 </div>
-
-                {/* 開賣狀態與建議搶票時機 */}
-                <div className="bg-white rounded-xl p-4 border border-slate-200/80 space-y-2.5 text-xs">
-                  <div className="font-bold text-slate-800 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-indigo-600" />
-                      <span>當日門票開賣狀態</span>
-                    </span>
-                    {currentDayData.bookingStatus === 'available' ? (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold">
-                        ✅ 已開放預訂
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-extrabold">
-                        ⏳ 尚未開賣
-                      </span>
-                    )}
-                  </div>
-
-                  {currentDayData.bookingStatus === 'available' ? (
-                    <p className="text-slate-600 leading-relaxed">
-                      <strong>{currentDayData.date}</strong> 目前已正式開賣！建議直接點上方 <strong>Klook / KKday</strong> 按鈕比價下單，可省去官網日圓刷卡 1.5% 海外手續費。
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <p className="text-slate-600 leading-relaxed">
-                        <strong>{currentDayData.date}</strong> 將於入園前 2 個月（預計 <strong className="text-indigo-700">{currentDayData.saleOpenDate} 台灣時間 13:00</strong>）準時開賣。
-                      </p>
-                      <p className="text-amber-700 font-bold">
-                        💡 建議先設定上方的「LINE 免費開賣提醒」，開賣當天我們會自動推播通知您搶第一波票！
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 淡旺季省錢與通關建議 */}
-                <div className="text-xs text-slate-600 bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-100 flex items-start gap-2.5">
-                  <Compass className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                  <div className="leading-relaxed">
-                    <strong className="text-indigo-900">入園購票建議：</strong>
-                    {currentDayData.tier === 'cheap'
-                      ? '此日屬於淡季平日票價區間，通常入園人潮較少、門票價格最划算！不需額外花錢加購 DPA 尊享卡也能玩得非常盡興。'
-                      : currentDayData.tier === 'moderate'
-                      ? '此日屬於一般週末或中等價位區間，建議提早鎖定早鳥票券，並於開園前抵達現場抽取免費優先入場卡 (PP)。'
-                      : '此日屬於連假或超級旺季高峰，熱門時段極易售罄！強烈建議開賣當天 13:00 準時透過 Klook / KKday 購票鎖定入園資格。'}
-                  </div>
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
+                  <a
+                    href={getCityExploreUrl('Klook')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => trackGaEvent('explore_more_click', { platform: 'Klook', park: selectedParkId })}
+                    className="flex-1 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                  >
+                    <span>🟠 逛逛 Klook 熱門活動</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <a
+                    href={getCityExploreUrl('KKday')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => trackGaEvent('explore_more_click', { platform: 'KKday', park: selectedParkId })}
+                    className="flex-1 px-4 py-3 bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                  >
+                    <span>🔵 逛逛 KKday 熱門活動</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
               </div>
 
@@ -2689,65 +2662,6 @@ export default function App() {
                 )}
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* 🗾 延伸周邊旅遊體驗與交通票券 (全站 Cookie 追蹤，不搶主視覺焦點) */}
-        <section className="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-amber-300 text-[11px] font-bold">
-              <span>✈️ 順便規劃行前交通與周邊景點</span>
-            </div>
-            <h3 className="text-lg sm:text-xl font-black tracking-tight">
-              {selectedParkId === 'tokyo'
-                ? '還沒買機場快線、晴空塔、富士山一日遊或日本 eSIM？'
-                : selectedParkId === 'hongkong'
-                ? '還沒買香港機場快線、太平山頂纜車、八達通或港澳網卡？'
-                : selectedParkId === 'shanghai'
-                ? '還沒買上海外灘觀光、機場接送或中港澳上網卡？'
-                : '還沒買環球影城、美國網卡或加州城市觀光通票？'}
-            </h3>
-            <p className="text-xs text-slate-300">
-              出發前一次備齊交通與網卡最省事，可搭配平台當期優惠券一併結帳！
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full md:w-auto">
-            <a
-              href={
-                selectedParkId === 'tokyo'
-                  ? 'https://www.klook.com/zh-TW/city/28-tokyo-things-to-do/?aid=144150'
-                  : selectedParkId === 'hongkong'
-                  ? 'https://www.klook.com/zh-TW/city/1-hong-kong-things-to-do/?aid=144150'
-                  : selectedParkId === 'shanghai'
-                  ? 'https://www.klook.com/zh-TW/city/25-shanghai-things-to-do/?aid=144150'
-                  : 'https://www.klook.com/zh-TW/city/79-los-angeles-things-to-do/?aid=144150'
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => trackGaEvent('explore_more_click', { platform: 'Klook', park: selectedParkId })}
-              className="flex-1 md:flex-initial px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
-            >
-              <span>🟠 逛逛 Klook {currentPark.shortName}熱門活動</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-            <a
-              href={
-                selectedParkId === 'tokyo'
-                  ? 'https://www.kkday.com/zh-tw/city/tokyo?cid=28178&ud1=disney_helper'
-                  : selectedParkId === 'hongkong'
-                  ? 'https://www.kkday.com/zh-tw/city/hong-kong?cid=28178&ud1=disney_helper'
-                  : selectedParkId === 'shanghai'
-                  ? 'https://www.kkday.com/zh-tw/city/shanghai?cid=28178&ud1=disney_helper'
-                  : 'https://www.kkday.com/zh-tw/city/los-angeles?cid=28178&ud1=disney_helper'
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => trackGaEvent('explore_more_click', { platform: 'KKday', park: selectedParkId })}
-              className="flex-1 md:flex-initial px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
-            >
-              <span>🔵 逛逛 KKday {currentPark.shortName}熱門活動</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
           </div>
         </section>
 
