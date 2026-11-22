@@ -2594,9 +2594,13 @@ export default function App() {
           {/* TOP 5 設施大卡片列表 (動態隨選中的分園/焦點園區瞬間切換) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {(((currentPark.subParkRides && currentPark.subParkRides[selectedSubParkIndex]) || currentPark.topRides)).map((ride, idx) => (
-              <div
+              <a
                 key={`${selectedSubParkIndex}-${idx}-${ride.name}`}
-                className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between space-y-3"
+                href={`https://www.google.com/search?q=${encodeURIComponent(`${currentPark.name} ${ride.name}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackGaEvent('ride_info_click', { park: selectedParkId, ride: ride.name })}
+                className="group p-5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between space-y-3 cursor-pointer"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
@@ -2607,8 +2611,9 @@ export default function App() {
                       {ride.zone}
                     </span>
                   </div>
-                  <h3 className="font-black text-base text-slate-900 mt-2 tracking-tight">
-                    {ride.name}
+                  <h3 className="font-black text-base text-slate-900 group-hover:text-indigo-700 mt-2 tracking-tight flex items-center justify-between gap-1.5 transition-colors">
+                    <span>{ride.name}</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 shrink-0 transition-colors" />
                   </h3>
                   <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
                     {ride.note}
@@ -2616,15 +2621,15 @@ export default function App() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1 text-slate-600 font-bold">
+                  <div className="flex items-center gap-1 text-indigo-600 font-bold group-hover:underline">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>必玩熱門推薦</span>
+                    <span>查看設施照片與介紹</span>
                   </div>
                   <span className="text-[11px] font-black text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300/60">
                     {ride.fastPass}
                   </span>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </section>
