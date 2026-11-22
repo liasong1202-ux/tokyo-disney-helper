@@ -1549,19 +1549,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         await saveStore(store);
       }
 
-      // 若有設定寄信服務 (Gmail 或 Resend)，自動寄送歡迎確認信
-      let welcomeEmailSent = false;
-      if (hasAnyEmailProvider(store)) {
-        const subject = targetDate
-          ? `🎟️ 開賣提醒設定成功！東京迪士尼【${targetDate}】開放訂票將立即通知您`
-          : '🏰 訂閱成功！東京迪士尼門票降價與開放訂票通知';
-        const emailResult = await sendUnifiedEmail(store, {
-          to: [email],
-          subject,
-          html: buildWelcomeEmailHtml(store, subscriber),
-        });
-        welcomeEmailSent = emailResult.ok;
-      }
+      // 依站長設定：訂閱成功時僅儲存名單（不立即寄出歡迎確認信，僅於「開賣當天」或「發布降價特惠」時發信通知，避免兩邊重複洗版）
+      const welcomeEmailSent = false;
 
       sendJson(res, 200, {
         ok: true,

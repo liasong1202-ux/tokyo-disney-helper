@@ -2617,6 +2617,65 @@ export default function App() {
           </div>
         </section>
 
+        {/* 🗾 延伸周邊旅遊體驗與交通票券 (全站 Cookie 追蹤，不搶主視覺焦點) */}
+        <section className="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-amber-300 text-[11px] font-bold">
+              <span>✈️ 順便規劃行前交通與周邊景點</span>
+            </div>
+            <h3 className="text-lg sm:text-xl font-black tracking-tight">
+              {selectedParkId === 'tokyo'
+                ? '還沒買機場快線、晴空塔、富士山一日遊或日本 eSIM？'
+                : selectedParkId === 'hongkong'
+                ? '還沒買香港機場快線、太平山頂纜車、八達通或港澳網卡？'
+                : selectedParkId === 'shanghai'
+                ? '還沒買上海外灘觀光、機場接送或中港澳上網卡？'
+                : '還沒買環球影城、美國網卡或加州城市觀光通票？'}
+            </h3>
+            <p className="text-xs text-slate-300">
+              出發前一次備齊交通與網卡最省事，可搭配平台當期優惠券一併結帳！
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full md:w-auto">
+            <a
+              href={
+                selectedParkId === 'tokyo'
+                  ? 'https://www.klook.com/zh-TW/city/28-tokyo-things-to-do/?aid=144150'
+                  : selectedParkId === 'hongkong'
+                  ? 'https://www.klook.com/zh-TW/city/1-hong-kong-things-to-do/?aid=144150'
+                  : selectedParkId === 'shanghai'
+                  ? 'https://www.klook.com/zh-TW/city/25-shanghai-things-to-do/?aid=144150'
+                  : 'https://www.klook.com/zh-TW/city/79-los-angeles-things-to-do/?aid=144150'
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackGaEvent('explore_more_click', { platform: 'Klook', park: selectedParkId })}
+              className="flex-1 md:flex-initial px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              <span>🟠 逛逛 Klook {currentPark.shortName}熱門活動</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href={
+                selectedParkId === 'tokyo'
+                  ? 'https://www.kkday.com/zh-tw/city/tokyo?cid=28178&ud1=disney_helper'
+                  : selectedParkId === 'hongkong'
+                  ? 'https://www.kkday.com/zh-tw/city/hong-kong?cid=28178&ud1=disney_helper'
+                  : selectedParkId === 'shanghai'
+                  ? 'https://www.kkday.com/zh-tw/city/shanghai?cid=28178&ud1=disney_helper'
+                  : 'https://www.kkday.com/zh-tw/city/los-angeles?cid=28178&ud1=disney_helper'
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackGaEvent('explore_more_click', { platform: 'KKday', park: selectedParkId })}
+              className="flex-1 md:flex-initial px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+            >
+              <span>🔵 逛逛 KKday {currentPark.shortName}熱門活動</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </section>
+
         {/* 🏢 專業正式頁尾 (Footer) */}
         <footer className="mt-14 border-t border-slate-200/90 pt-8 pb-10 text-xs text-slate-500 space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -2700,11 +2759,6 @@ export default function App() {
                   ⏰ 預計開賣時間：<span style={{ color: char.themeColor }} className="font-black">{reservedOpenDateInfo.saleOpenDate} 台灣時間 13:00</span>
                 </div>
               )}
-              {welcomeEmailSent && (
-                <div className="mt-2 inline-block px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
-                  ✅ 已同步寄出確認信至您的信箱！
-                </div>
-              )}
               <p className="text-xs sm:text-sm text-slate-600 mt-4 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                 {reservedOpenDateInfo ? (
                   <>
@@ -2716,20 +2770,30 @@ export default function App() {
                   </>
                 )}
               </p>
-              <div className="mt-5 grid grid-cols-1 gap-2.5">
-                <button
-                  onClick={() => handleAffiliateClick('Klook')}
-                  className={`w-full py-3 px-4 bg-gradient-to-r ${char.buttonGradient} ${char.buttonText} font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all hover:opacity-95`}
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                  <span>前往 Klook 查看即時票價與特惠</span>
-                </button>
+              <div className="mt-5 space-y-2.5">
                 <button
                   onClick={() => setShowSubscribeModal(false)}
-                  className="w-full py-3 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs sm:text-sm rounded-xl transition-all cursor-pointer"
+                  className={`w-full py-3.5 px-6 bg-gradient-to-r ${char.buttonGradient} ${char.buttonText} font-black text-xs sm:text-sm rounded-xl shadow-md transition-all cursor-pointer hover:opacity-95`}
                 >
-                  返回查看低價日曆
+                  返回首頁・繼續逛逛
                 </button>
+                <a
+                  href={
+                    selectedParkId === 'tokyo'
+                      ? 'https://www.klook.com/zh-TW/city/28-tokyo-things-to-do/?aid=144150'
+                      : selectedParkId === 'hongkong'
+                      ? 'https://www.klook.com/zh-TW/city/1-hong-kong-things-to-do/?aid=144150'
+                      : selectedParkId === 'shanghai'
+                      ? 'https://www.klook.com/zh-TW/city/25-shanghai-things-to-do/?aid=144150'
+                      : 'https://www.klook.com/zh-TW/city/79-los-angeles-things-to-do/?aid=144150'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackGaEvent('explore_more_click', { platform: 'Klook_modal', park: selectedParkId })}
+                  className="block w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all text-center"
+                >
+                  順便逛逛當地其他交通與熱門體驗 →
+                </a>
               </div>
             </div>
           </div>
