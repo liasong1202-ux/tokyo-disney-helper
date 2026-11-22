@@ -743,6 +743,35 @@ export default function App() {
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
 
+  // 取得含聯盟行銷代碼的當地其他交通與熱門體驗網址
+  const getCityExploreUrl = (platform: 'Klook' | 'KKday') => {
+    if (platform === 'Klook') {
+      const aidMatch = (affiliateConfig.klookUrl || '').match(/aid=([0-9a-zA-Z_-]+)/);
+      const activeAid = aidMatch ? aidMatch[1] : '144150';
+      const citySlug =
+        selectedParkId === 'tokyo'
+          ? '28-tokyo-things-to-do'
+          : selectedParkId === 'hongkong'
+          ? '1-hong-kong-things-to-do'
+          : selectedParkId === 'shanghai'
+          ? '25-shanghai-things-to-do'
+          : '79-los-angeles-things-to-do';
+      return `https://www.klook.com/zh-TW/city/${citySlug}/?aid=${activeAid}`;
+    } else {
+      const cidMatch = (affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
+      const activeCid = cidMatch ? cidMatch[1] : '28178';
+      const citySlug =
+        selectedParkId === 'tokyo'
+          ? 'tokyo'
+          : selectedParkId === 'hongkong'
+          ? 'hong-kong'
+          : selectedParkId === 'shanghai'
+          ? 'shanghai'
+          : 'los-angeles';
+      return `https://www.kkday.com/zh-tw/city/${citySlug}?cid=${activeCid}&ud1=disney_helper`;
+    }
+  };
+
   // 模擬平台突發促銷特惠觸發
   const handleSimulatePromo = () => {
     if (promoState && promoState.active) {
@@ -2196,15 +2225,27 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleAffiliateClick('Klook')}
-                    className="mt-6 w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    <span>前往 Klook 購票 (享【{currentPark.shortName}】專屬特惠)</span>
-                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-                  </button>
+                  <div className="mt-6 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAffiliateClick('Klook')}
+                      className="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>前往 Klook 購票</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                    </button>
+                    <a
+                      href={getCityExploreUrl('Klook')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackGaEvent('explore_more_click', { platform: 'Klook_card', park: selectedParkId })}
+                      className="w-full py-2 px-3 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <span>逛逛當地其他交通與熱門體驗</span>
+                      <ExternalLink className="w-3 h-3 opacity-80" />
+                    </a>
+                  </div>
                 </div>
 
                 {/* 2. KKday */}
@@ -2248,15 +2289,27 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleAffiliateClick('KKday')}
-                    className="mt-6 w-full py-3 px-4 bg-sky-600 hover:bg-sky-700 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    <span>前往 KKday 預訂 (享【{currentPark.shortName}】專屬方案)</span>
-                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-                  </button>
+                  <div className="mt-6 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAffiliateClick('KKday')}
+                      className="w-full py-3 px-4 bg-sky-600 hover:bg-sky-700 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>前往 KKday 購票</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                    </button>
+                    <a
+                      href={getCityExploreUrl('KKday')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackGaEvent('explore_more_click', { platform: 'KKday_card', park: selectedParkId })}
+                      className="w-full py-2 px-3 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <span>逛逛當地其他交通與熱門體驗</span>
+                      <ExternalLink className="w-3 h-3 opacity-80" />
+                    </a>
+                  </div>
                 </div>
 
                 {/* 3. 官方網站 */}
@@ -2795,24 +2848,16 @@ export default function App() {
               <div className="mt-5 space-y-2.5">
                 <button
                   onClick={() => setShowSubscribeModal(false)}
-                  className={`w-full py-3.5 px-6 bg-gradient-to-r ${char.buttonGradient} ${char.buttonText} font-black text-xs sm:text-sm rounded-xl shadow-md transition-all cursor-pointer hover:opacity-95`}
+                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition-all cursor-pointer"
                 >
-                  返回首頁・繼續逛逛
+                  返回首頁
                 </button>
                 <a
-                  href={
-                    selectedParkId === 'tokyo'
-                      ? 'https://www.klook.com/zh-TW/city/28-tokyo-things-to-do/?aid=144150'
-                      : selectedParkId === 'hongkong'
-                      ? 'https://www.klook.com/zh-TW/city/1-hong-kong-things-to-do/?aid=144150'
-                      : selectedParkId === 'shanghai'
-                      ? 'https://www.klook.com/zh-TW/city/25-shanghai-things-to-do/?aid=144150'
-                      : 'https://www.klook.com/zh-TW/city/79-los-angeles-things-to-do/?aid=144150'
-                  }
+                  href={getCityExploreUrl('Klook')}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => trackGaEvent('explore_more_click', { platform: 'Klook_modal', park: selectedParkId })}
-                  className="block w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all text-center"
+                  className={`block w-full py-3.5 px-6 bg-gradient-to-r ${char.buttonGradient} ${char.buttonText} font-black text-xs sm:text-sm rounded-xl shadow-md transition-all text-center hover:opacity-95`}
                 >
                   順便逛逛當地其他交通與熱門體驗 →
                 </a>
