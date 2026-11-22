@@ -351,7 +351,7 @@ export const DISNEY_PARKS: Record<DisneyParkId, ParkConfig> = {
       ],
     },
     klookUrl: 'https://www.klook.com/zh-TW/activity/3969-disneyland-resort-paris/',
-    kkdayUrl: 'https://www.kkday.com/zh-tw/product/24625',
+    kkdayUrl: 'https://www.kkday.com/zh-tw/product/productlist?keyword=%E5%B7%B4%E9%BB%8E%E8%BF%AA%E5%A3%AB%E5%B0%BC',
     officialUrl: 'https://www.disneylandparis.com/en-usd/tickets/',
     klookPromoCode: 'EURDISNEYTW',
     klookPromoDesc: '歐洲旅遊滿額折抵優惠碼',

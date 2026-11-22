@@ -1146,12 +1146,12 @@ export function buildLineTicketOpenFlexMessage(
   const avatarUrl = `https://tokyo-disney-helper.vercel.app/characters/${char.id}.png`;
 
   const safeKkdayUrl = sanitizeHttpsUrl(
-    kkdayUrl,
-    'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper'
+    ensureKkdayAffiliateUrl(kkdayUrl),
+    DEFAULT_KKDAY_URL
   );
   const safeKlookUrl = sanitizeHttpsUrl(
-    klookUrl,
-    'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/'
+    ensureKlookAffiliateUrl(klookUrl),
+    DEFAULT_KLOOK_URL
   );
   const safeOfficialUrl = sanitizeHttpsUrl(officialUrl, 'https://www.tokyodisneyresort.jp/tc/ticket/');
 
@@ -2181,13 +2181,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const parkName = body.parkName || (targetSub?.targetPark === 'sea' ? '東京迪士尼海洋' : '東京迪士尼樂園');
       const characterId = targetSub?.characterId || body.characterId || 'minnie';
 
-      const cidMatch = (store.affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
-      const activeCid = cidMatch ? cidMatch[1] : '28178';
-      let kkdayUrl = store.affiliateConfig.kkdayUrl || 'https://www.kkday.com/zh-tw/product/19252';
-      if (!kkdayUrl.includes('cid=')) {
-        kkdayUrl += `${kkdayUrl.includes('?') ? '&' : '?'}cid=${activeCid}&ud1=disney_helper`;
-      }
-      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/';
+      const kkdayUrl = ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl);
+      const klookUrl = ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl);
       const officialUrl = store.affiliateConfig.officialUrl || 'https://www.tokyodisneyresort.jp/tc/ticket/';
 
       const flexMessage = buildLineTicketOpenFlexMessage(
@@ -2271,13 +2266,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       let notifiedEmailCount = 0;
       const logs: string[] = [];
 
-      const cidMatch = (store.affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
-      const activeCid = cidMatch ? cidMatch[1] : '28178';
-      let kkdayUrl = store.affiliateConfig.kkdayUrl || 'https://www.kkday.com/zh-tw/product/19252';
-      if (!kkdayUrl.includes('cid=')) {
-        kkdayUrl += `${kkdayUrl.includes('?') ? '&' : '?'}cid=${activeCid}&ud1=disney_helper`;
-      }
-      const klookUrl = store.affiliateConfig.klookUrl || 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/';
+      const kkdayUrl = ensureKkdayAffiliateUrl(store.affiliateConfig.kkdayUrl);
+      const klookUrl = ensureKlookAffiliateUrl(store.affiliateConfig.klookUrl);
       const officialUrl = store.affiliateConfig.officialUrl || 'https://www.tokyodisneyresort.jp/tc/ticket/';
 
       for (const sub of store.subscribers) {

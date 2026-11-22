@@ -215,8 +215,8 @@ export default function App() {
   // 後端聯盟行銷連結與常駐優惠設定
   const [affiliateConfig, setAffiliateConfig] = useState<AffiliateConfig>(() => {
     const base: AffiliateConfig = {
-      klookUrl: 'https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/',
-      kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan',
+      klookUrl: 'https://affiliate.klook.com/redirect?aid=144150&aff_adid=1585528&k_site=https%3A%2F%2Fwww.klook.com%2Fzh-TW%2Factivity%2F695-tokyo-disney-resort-1-day-pass-tokyo%2F',
+      kkdayUrl: 'https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper',
       officialUrl: 'https://www.tokyodisneyresort.jp/tc/ticket/',
       klookDefaultCode: '',
       klookDefaultDesc: '',
@@ -751,13 +751,18 @@ export default function App() {
         ? 'https://disneyworld.disney.go.com/tickets/'
         : currentPark.officialUrl;
 
-    // 自動附加 Klook (AID) 與 KKday (CID) 專屬分潤追蹤碼，確保全球各樂園均能累積收益
-    if (platform === 'Klook') {
+    // 自動附加 Klook (AID + AFF_ADID) 與 KKday (CID) 專屬分潤追蹤碼，確保全球各樂園均能累積收益
+    const toKlookAffiliateUrl = (rawUrl: string) => {
+      if (rawUrl.includes('affiliate.klook.com') || rawUrl.includes('aid=')) return rawUrl;
       const aidMatch = (affiliateConfig.klookUrl || '').match(/aid=([0-9a-zA-Z_-]+)/);
+      const adidMatch = (affiliateConfig.klookUrl || '').match(/aff_adid=([0-9a-zA-Z_-]+)/);
       const activeAid = aidMatch ? aidMatch[1] : '144150';
-      if (!targetUrl.includes('aid=')) {
-        targetUrl += `${targetUrl.includes('?') ? '&' : '?'}aid=${activeAid}`;
-      }
+      const activeAdid = adidMatch ? adidMatch[1] : '1585528';
+      return `https://affiliate.klook.com/redirect?aid=${activeAid}&aff_adid=${activeAdid}&k_site=${encodeURIComponent(rawUrl)}`;
+    };
+
+    if (platform === 'Klook') {
+      targetUrl = toKlookAffiliateUrl(targetUrl);
     } else if (platform === 'KKday') {
       const cidMatch = (affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
       const activeCid = cidMatch ? cidMatch[1] : '28178';
@@ -773,7 +778,9 @@ export default function App() {
   const getCityExploreUrl = (platform: 'Klook' | 'KKday') => {
     if (platform === 'Klook') {
       const aidMatch = (affiliateConfig.klookUrl || '').match(/aid=([0-9a-zA-Z_-]+)/);
+      const adidMatch = (affiliateConfig.klookUrl || '').match(/aff_adid=([0-9a-zA-Z_-]+)/);
       const activeAid = aidMatch ? aidMatch[1] : '144150';
+      const activeAdid = adidMatch ? adidMatch[1] : '1585528';
       const citySlug =
         selectedParkId === 'tokyo'
           ? '28-tokyo-things-to-do'
@@ -786,7 +793,8 @@ export default function App() {
           : selectedSubParkIndex === 2
           ? '83-orlando-things-to-do'
           : '79-los-angeles-things-to-do';
-      return `https://www.klook.com/zh-TW/city/${citySlug}/?aid=${activeAid}`;
+      const destUrl = `https://www.klook.com/zh-TW/city/${citySlug}/`;
+      return `https://affiliate.klook.com/redirect?aid=${activeAid}&aff_adid=${activeAdid}&k_site=${encodeURIComponent(destUrl)}`;
     } else {
       const cidMatch = (affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
       const activeCid = cidMatch ? cidMatch[1] : '28178';
@@ -1090,7 +1098,7 @@ export default function App() {
                 <li>✅ 憑證即時出票，手機 QR Code 直接掃碼入園</li>
               </ul>
             </div>
-            <a href="https://www.klook.com/zh-TW/activity/695-tokyo-disney-resort-1-day-pass-tokyo/?aid=affiliate_disney_tw" target="_blank" rel="noopener noreferrer" class="mt-5 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all">
+            <a href="https://affiliate.klook.com/redirect?aid=144150&aff_adid=1585528&k_site=https%3A%2F%2Fwww.klook.com%2Fzh-TW%2Factivity%2F695-tokyo-disney-resort-1-day-pass-tokyo%2F" target="_blank" rel="noopener noreferrer" class="mt-5 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all">
               <span>🛒</span>
               <span>前往 Klook 購票 (享專屬特惠)</span>
             </a>
@@ -1116,7 +1124,7 @@ export default function App() {
                 <li>✅ 可合購東京地鐵 24 小時 Pass 享超值套裝</li>
               </ul>
             </div>
-            <a href="https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=affiliate_disney_tw" target="_blank" rel="noopener noreferrer" class="mt-5 w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all">
+            <a href="https://www.kkday.com/zh-tw/product/19252-tokyo-disneyland-tokyo-disneysea-tickets-japan?cid=28178&ud1=disney_helper" target="_blank" rel="noopener noreferrer" class="mt-5 w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all">
               <span>🛒</span>
               <span>前往 KKday 預訂 (送eSIM優惠)</span>
             </a>
