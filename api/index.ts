@@ -331,6 +331,7 @@ export interface StoreData {
       HKD: number;
       CNY: number;
       USD: number;
+      EUR?: number;
     };
     updatedAt: string;
     source: string;
@@ -412,6 +413,7 @@ const DEFAULT_STORE: StoreData = {
       HKD: 4.15,
       CNY: 4.45,
       USD: 32.5,
+      EUR: 34.8,
     },
     updatedAt: new Date().toISOString(),
     source: '預設匯率 (待自動同步)',
@@ -616,10 +618,10 @@ export async function saveStore(data: StoreData): Promise<{ ok: boolean; storage
   }
 }
 
-// 自動抓取全球迪士尼 4 大幣別對台幣即時匯率 (JPY / HKD / CNY / USD -> TWD)
+// 自動抓取全球迪士尼 5 大幣別對台幣即時匯率 (JPY / HKD / CNY / USD / EUR -> TWD)
 export async function fetchLatestJpyRate(force = false): Promise<{
   rate: number;
-  rates?: { JPY: number; HKD: number; CNY: number; USD: number };
+  rates?: { JPY: number; HKD: number; CNY: number; USD: number; EUR?: number };
   updatedAt: string;
   source: string;
 }> {
@@ -631,17 +633,18 @@ export async function fetchLatestJpyRate(force = false): Promise<{
     !force &&
     store.exchangeRateCache.source !== '預設匯率 (待自動同步)' &&
     store.exchangeRateCache.rates &&
+    typeof store.exchangeRateCache.rates.EUR === 'number' &&
     lastUpdated > oneHourAgo
   ) {
     return store.exchangeRateCache;
   }
 
   try {
-    // 以 TWD 為基準一次抓回 JPY / HKD / CNY / USD 4 國即時匯率
+    // 以 TWD 為基準一次抓回 JPY / HKD / CNY / USD / EUR 5 國即時匯率
     const res = await fetch('https://open.er-api.com/v6/latest/TWD');
     if (res.ok) {
       const json = (await res.json()) as {
-        rates?: { JPY?: number; HKD?: number; CNY?: number; USD?: number };
+        rates?: { JPY?: number; HKD?: number; CNY?: number; USD?: number; EUR?: number };
       };
       const r = json?.rates;
       if (r && typeof r.JPY === 'number' && r.JPY > 0) {
@@ -649,6 +652,7 @@ export async function fetchLatestJpyRate(force = false): Promise<{
         const hkdRate = typeof r.HKD === 'number' && r.HKD > 0 ? Number((1 / r.HKD).toFixed(4)) : 4.15;
         const cnyRate = typeof r.CNY === 'number' && r.CNY > 0 ? Number((1 / r.CNY).toFixed(4)) : 4.45;
         const usdRate = typeof r.USD === 'number' && r.USD > 0 ? Number((1 / r.USD).toFixed(4)) : 32.5;
+        const eurRate = typeof r.EUR === 'number' && r.EUR > 0 ? Number((1 / r.EUR).toFixed(4)) : 34.8;
 
         if (jpyRate > 0.1 && jpyRate < 0.5) {
           store.exchangeRateCache = {
@@ -658,6 +662,7 @@ export async function fetchLatestJpyRate(force = false): Promise<{
               HKD: hkdRate,
               CNY: cnyRate,
               USD: usdRate,
+              EUR: eurRate,
             },
             updatedAt: new Date().toISOString(),
             source: '國際即時匯率 API (全幣別自動同步)',

@@ -2,7 +2,7 @@
  * 全球迪士尼樂園資料庫配置 (東京 Tokyo / 香港 Hong Kong / 上海 Shanghai / 歐美 USA)
  */
 
-export type DisneyParkId = 'tokyo' | 'hongkong' | 'shanghai' | 'usa';
+export type DisneyParkId = 'tokyo' | 'hongkong' | 'shanghai' | 'usa' | 'paris';
 
 export interface ParkTierInfo {
   tier: 'cheap' | 'moderate' | 'expensive';
@@ -27,7 +27,7 @@ export interface ParkConfig {
   englishName: string;
   country: string;
   flag: string;
-  currencyCode: 'JPY' | 'HKD' | 'CNY' | 'USD';
+  currencyCode: 'JPY' | 'HKD' | 'CNY' | 'USD' | 'EUR';
   currencySymbol: string;
   currencyName: string;
   defaultRate: number; // 換算台幣基準
@@ -248,7 +248,7 @@ export const DISNEY_PARKS: Record<DisneyParkId, ParkConfig> = {
     tagline: '迪士尼世界夢想發源地 · 星際大戰與阿凡達世界',
     highlightsBadge: '🚀 加州星際大戰 + 奧蘭多阿凡達',
     newZoneName: '星際大戰：銀河邊緣 (Star Wars: Galaxy\'s Edge)',
-    subParks: ['🏰 加州迪士尼樂園 (Disneyland)', '🎡 加州冒險樂園 (California Adventure)', '🌐 奧蘭多四大園區 (Disney World)'],
+    subParks: ['🏰 加州迪士尼樂園 (Disneyland)', '🎡 加州冒險樂園 (California Adventure)', '🌐 佛羅里達奧蘭多 (Disney World 4大園區)'],
     bookingWindow: '提前 120 天開放預約 · 需 Park Pass 預約',
     bookingRulesSummary: '採多日票（Multi-Day Ticket）與 1-Day Tier 1~6 票價制。購買門票後需至官網綁定日期預約（Park Pass Reservation）。',
     features: [
@@ -299,6 +299,66 @@ export const DISNEY_PARKS: Record<DisneyParkId, ParkConfig> = {
     accentColor: '#dc2626',
     gradient: 'from-blue-950 via-slate-900 to-red-950',
   },
+  paris: {
+    id: 'paris',
+    name: '法國巴黎迪士尼樂園',
+    shortName: '巴黎',
+    englishName: 'Disneyland Paris',
+    country: '法國 (France)',
+    flag: '🇫🇷',
+    currencyCode: 'EUR',
+    currencySymbol: '€',
+    currencyName: '歐元',
+    defaultRate: 34.8,
+    ratePrefix: 'FR 1 EUR',
+    tagline: '歐洲唯一迪士尼度假區 · 粉紅睡美人城堡與漫威復仇者園區',
+    highlightsBadge: '🥐 歐洲雙園暢遊 · 2026 冰雪奇緣世界',
+    newZoneName: '華特迪士尼影城 · 漫威復仇者校園 (Avengers Campus)',
+    subParks: ['🏰 巴黎迪士尼樂園 (Disneyland Park)', '🎬 華特迪士尼影城 (Walt Disney Studios)'],
+    bookingWindow: '採浮動日期票價制 · 提前預訂享歐元最優價',
+    bookingRulesSummary: '採浮動日期定價（Mini / Magic / Super Magic 等級），強烈建議提前購買「一日雙園」電子票，RER A 線直達門口。',
+    features: [
+      '歐洲唯一迪士尼！擁有全球最夢幻的粉紅睡美人城堡與城堡下巨龍洞穴',
+      '獨家倒立翻轉「超空間山 Hyperspace Mountain」與《料理鼠王》4D 冒險',
+      '巴黎市區搭乘 RER A 快線約 40 分鐘直達園區門口，交通超方便',
+    ],
+    tiers: [
+      { tier: 'cheap', label: '💰 最便宜', badge: '淡季平日票', localPrice: 56, description: '非旺季平日單園票（約 NT$ 1,950）' },
+      { tier: 'moderate', label: '⚖️ 普通適中', badge: '一般週末日', localPrice: 79, description: '常規週末與春季日（約 NT$ 2,750）' },
+      { tier: 'expensive', label: '🚨 極貴/連假', badge: '旺季高峰日', localPrice: 105, description: '歐洲暑假、萬聖節與聖誕跨年（約 NT$ 3,650）' },
+    ],
+    topRides: [
+      { name: '超空間山 (Hyperspace Mountain)', zone: '巴黎樂園 · 探索世界', avgWait: '45~75分', fastPass: 'Premier Access', note: '全球唯一會 360 度倒立翻轉的星際大戰版太空山' },
+      { name: '料理鼠王：大冒險 (Ratatouille)', zone: '迪士尼影城', avgWait: '50~85分', fastPass: 'Premier Access', note: '縮小成老鼠視角穿梭法式餐廳廚房，巴黎必玩經典' },
+      { name: '巨雷山 (Big Thunder Mountain)', zone: '巴黎樂園 · 邊域世界', avgWait: '45~80分', fastPass: 'Premier Access', note: '位於湖心島上，公認全球速度最快、最長版本的巨雷山' },
+      { name: '驚魂古塔 (Tower of Terror)', zone: '迪士尼影城', avgWait: '50~80分', fastPass: 'Premier Access', note: '結合陰陽魔界劇情的極速自由落體跳樓機' },
+      { name: '史密斯飛船 / 復仇者雲霄飛車', zone: '迪士尼影城 · 漫威園區', avgWait: '40~70分', fastPass: 'Premier Access', note: '鋼鐵人與驚奇隊長主題高速彈射室內翻轉雲霄飛車' },
+    ],
+    subParkRides: {
+      0: [
+        { name: '超空間山 (Hyperspace Mountain)', zone: '探索世界', avgWait: '45~75分', fastPass: 'Premier Access', note: '全球唯一會 360 度倒立翻轉的星戰版太空山，超刺激' },
+        { name: '巨雷山 (Big Thunder Mountain)', zone: '邊域世界', avgWait: '45~80分', fastPass: 'Premier Access', note: '穿過湖底隧道登上湖心礦山島，公認全球最佳巨雷山' },
+        { name: '幽靈莊園 (Phantom Manor)', zone: '邊域世界', avgWait: '25~45分', fastPass: '常規排隊', note: '巴黎專屬暗黑新娘故事線，氣氛詭譎精緻' },
+        { name: '加勒比海盜 (Pirates of the Caribbean)', zone: '冒險世界', avgWait: '20~40分', fastPass: '常規排隊', note: '含兩段俯衝水花與傑克船長登場，經典必搭' },
+        { name: '睡美人城堡與巨龍洞穴', zone: '夢幻世界', avgWait: '免排隊', fastPass: '地標必拍', note: '全球最美粉紅城堡，地下室還藏著會噴煙的真實巨龍' },
+      ],
+      1: [
+        { name: '料理鼠王：大冒險 (Ratatouille)', zone: '皮克斯世界', avgWait: '50~85分', fastPass: 'Premier Access', note: '無軌 4D 縮小成小米在餐廳廚房躲避追捕，親子最愛' },
+        { name: '復仇者集結：極速飛行 (Flight Force)', zone: '漫威復仇者校園', avgWait: '40~70分', fastPass: 'Premier Access', note: '2.8 秒極速彈射＋多次翻轉，鋼鐵人迷必衝' },
+        { name: '蜘蛛人 W.E.B. 大冒險', zone: '漫威復仇者校園', avgWait: '45~75分', fastPass: 'Premier Access', note: '裸手體感射出蜘蛛絲抓機器人，互動性滿分' },
+        { name: '海底總動員「龜龜雲霄飛車」(Crush\'s Coaster)', zone: '皮克斯世界', avgWait: '60~100分', fastPass: 'Premier Access', note: '巴黎影城人氣第一！龜殼車廂在黑暗洋流中旋轉俯衝' },
+        { name: '驚魂古塔 (Tower of Terror)', zone: '好萊塢區', avgWait: '50~80分', fastPass: 'Premier Access', note: '隨機墜落劇本，歐洲最具代表性的刺激跳樓機' },
+      ],
+    },
+    klookUrl: 'https://www.klook.com/zh-TW/activity/4304-disneyland-paris-ticket/',
+    kkdayUrl: 'https://www.kkday.com/zh-tw/product/10220',
+    officialUrl: 'https://www.disneylandparis.com/en-usd/',
+    klookPromoCode: 'EURDISNEYTW',
+    klookPromoDesc: '歐洲旅遊滿額折抵優惠碼',
+    kkdayBonus: '贈歐洲跨國 eSIM 專屬折扣',
+    accentColor: '#be185d',
+    gradient: 'from-rose-950 via-purple-950 to-indigo-950',
+  },
 };
 
 export const PARKS_LIST: ParkConfig[] = [
@@ -306,5 +366,6 @@ export const PARKS_LIST: ParkConfig[] = [
   DISNEY_PARKS.hongkong,
   DISNEY_PARKS.shanghai,
   DISNEY_PARKS.usa,
+  DISNEY_PARKS.paris,
 ];
 

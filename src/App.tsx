@@ -150,12 +150,12 @@ export default function App() {
     return new Date(Date.now() + 8 * 3600 * 1000).getUTCMonth() + 1;
   });
 
-  // 全球迪士尼樂園切換：'tokyo' | 'hongkong' | 'shanghai' | 'usa'
+  // 全球迪士尼樂園切換：'tokyo' | 'hongkong' | 'shanghai' | 'usa' | 'paris'
   const [selectedParkId, setSelectedParkId] = useState<DisneyParkId>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
       const park = p.get('park');
-      if (park === 'hongkong' || park === 'shanghai' || park === 'usa' || park === 'tokyo') {
+      if (park === 'hongkong' || park === 'shanghai' || park === 'usa' || park === 'paris' || park === 'tokyo') {
         return park as DisneyParkId;
       }
     }
@@ -190,13 +190,14 @@ export default function App() {
   // 票種 (成人、中人/學生、兒童)
   const [ticketType, setTicketType] = useState<'adult' | 'junior' | 'child'>('adult');
 
-  // 匯率設定 (啟動後自動向後端同步最新國際即時匯率：JPY / HKD / CNY / USD -> TWD)
+  // 匯率設定 (啟動後自動向後端同步最新國際即時匯率：JPY / HKD / CNY / USD / EUR -> TWD)
   const [exchangeRate, setExchangeRate] = useState<number>(0.2058);
-  const [currencyRates, setCurrencyRates] = useState<{ JPY: number; HKD: number; CNY: number; USD: number }>({
+  const [currencyRates, setCurrencyRates] = useState<{ JPY: number; HKD: number; CNY: number; USD: number; EUR: number }>({
     JPY: 0.2058,
     HKD: 4.15,
     CNY: 4.45,
     USD: 32.5,
+    EUR: 34.8,
   });
   const [exchangeRateSource, setExchangeRateSource] = useState<string>('國際即時匯率 (自動同步)');
 
@@ -207,6 +208,8 @@ export default function App() {
       ? (currencyRates.HKD || currentPark.defaultRate)
       : selectedParkId === 'shanghai'
       ? (currencyRates.CNY || currentPark.defaultRate)
+      : selectedParkId === 'paris'
+      ? (currencyRates.EUR || currentPark.defaultRate)
       : (currencyRates.USD || currentPark.defaultRate);
 
   // 後端聯盟行銷連結與常駐優惠設定
@@ -412,7 +415,11 @@ export default function App() {
       tokyo: { lat: 35.6329, lon: 139.8804, tz: 'Asia/Tokyo' },
       hongkong: { lat: 22.313, lon: 114.0413, tz: 'Asia/Hong_Kong' },
       shanghai: { lat: 31.1434, lon: 121.658, tz: 'Asia/Shanghai' },
-      usa: { lat: 33.8121, lon: -117.919, tz: 'America/Los_Angeles' },
+      usa:
+        selectedSubParkIndex === 2
+          ? { lat: 28.3852, lon: -81.5639, tz: 'America/New_York' }
+          : { lat: 33.8121, lon: -117.919, tz: 'America/Los_Angeles' },
+      paris: { lat: 48.8674, lon: 2.7836, tz: 'Europe/Paris' },
     };
     const cfg = coords[selectedParkId] || coords.tokyo;
     fetch(
@@ -434,7 +441,7 @@ export default function App() {
         }
       })
       .catch(() => {});
-  }, [selectedParkId]);
+  }, [selectedParkId, selectedSubParkIndex]);
 
   // 當月資料 (依當前年份、月份與選定樂園動態生成)
   const monthDays = useMemo(() => {
@@ -731,8 +738,14 @@ export default function App() {
         ? (selectedParkId === 'tokyo' ? affiliateConfig.kkdayUrl : currentPark.kkdayUrl)
         : (selectedParkId === 'tokyo' ? affiliateConfig.officialUrl : currentPark.officialUrl);
 
-    // 自動附加 KKday 專屬分潤追蹤碼 (CID 28178)，確保香港、上海、美國全樂園均能累積收益
-    if (platform === 'KKday') {
+    // 自動附加 Klook (AID) 與 KKday (CID) 專屬分潤追蹤碼，確保全球各樂園均能累積收益
+    if (platform === 'Klook') {
+      const aidMatch = (affiliateConfig.klookUrl || '').match(/aid=([0-9a-zA-Z_-]+)/);
+      const activeAid = aidMatch ? aidMatch[1] : '144150';
+      if (!targetUrl.includes('aid=')) {
+        targetUrl += `${targetUrl.includes('?') ? '&' : '?'}aid=${activeAid}`;
+      }
+    } else if (platform === 'KKday') {
       const cidMatch = (affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
       const activeCid = cidMatch ? cidMatch[1] : '28178';
       if (!targetUrl.includes('cid=')) {
@@ -755,6 +768,10 @@ export default function App() {
           ? '1-hong-kong-things-to-do'
           : selectedParkId === 'shanghai'
           ? '25-shanghai-things-to-do'
+          : selectedParkId === 'paris'
+          ? '10-paris-things-to-do'
+          : selectedSubParkIndex === 2
+          ? '83-orlando-things-to-do'
           : '79-los-angeles-things-to-do';
       return `https://www.klook.com/zh-TW/city/${citySlug}/?aid=${activeAid}`;
     } else {
@@ -767,6 +784,10 @@ export default function App() {
           ? 'hk-hong-kong'
           : selectedParkId === 'shanghai'
           ? 'cn-shanghai'
+          : selectedParkId === 'paris'
+          ? 'fr-paris'
+          : selectedSubParkIndex === 2
+          ? 'us-orlando'
           : 'us-los-angeles';
       return `https://www.kkday.com/zh-tw/destination/${destSlug}?cid=${activeCid}&ud3=prodcard&ud4=recommend`;
     }
@@ -795,11 +816,18 @@ export default function App() {
           { icon: '🏙️', label: '東方明珠 / 黃浦江' },
           { icon: '🏮', label: '朱家角 / 蘇杭一日遊' },
         ]
+      : selectedParkId === 'paris'
+      ? [
+          { icon: '🚄', label: 'RER A 直達 / 機場接送' },
+          { icon: '📶', label: '歐洲跨國 eSIM 網卡' },
+          { icon: '🗼', label: '艾菲爾鐵塔 / 羅浮宮' },
+          { icon: '🚢', label: '塞納河遊船晚餐' },
+        ]
       : [
-          { icon: '🎬', label: '好萊塢環球影城' },
+          { icon: '🎬', label: '好萊塢 / 奧蘭多環球' },
           { icon: '📶', label: '美國高速 eSIM' },
-          { icon: '🚌', label: '洛杉磯機場接送' },
-          { icon: '🌴', label: '加州城市觀光通票' },
+          { icon: '🚌', label: '機場接送 / 租車' },
+          { icon: '🌴', label: '美國城市觀光通票' },
         ];
   };
 
@@ -1477,47 +1505,13 @@ export default function App() {
 
       {/* 頂部導航列 */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:h-16 flex flex-wrap items-center justify-between gap-3">
-          {/* Zone 1: 品牌標題與全球樂園快速切換器 */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
-              <span className="text-xl sm:text-2xl" role="img" aria-label="castle">🏰</span>
-              <span className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
-                海外樂園門票情報
-              </span>
-            </div>
-
-            {/* 🌐 全球迪士尼分園快速切換器 (Park Switcher) */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-2xs overflow-x-auto max-w-full">
-              {PARKS_LIST.map((park) => {
-                const isActive = park.id === selectedParkId;
-                return (
-                  <button
-                    key={park.id}
-                    type="button"
-                    onClick={() => handleParkSwitch(park.id)}
-                    className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-black rounded-lg transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
-                      isActive
-                        ? 'bg-indigo-600 text-white shadow-xs scale-102'
-                        : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
-                    }`}
-                  >
-                    <span>{park.flag}</span>
-                    <span>{park.shortName}</span>
-                    {park.id === 'hongkong' && (
-                      <span className="hidden md:inline-block text-[9px] bg-sky-400 text-slate-950 px-1 rounded font-bold leading-none">
-                        冰雪
-                      </span>
-                    )}
-                    {park.id === 'shanghai' && (
-                      <span className="hidden md:inline-block text-[9px] bg-amber-400 text-slate-950 px-1 rounded font-bold leading-none">
-                        動物城
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:h-16 flex items-center justify-between gap-3">
+          {/* Zone 1: 品牌標題 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xl sm:text-2xl" role="img" aria-label="castle">🏰</span>
+            <span className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight whitespace-nowrap">
+              全球迪士尼門票比價情報
+            </span>
           </div>
 
           {/* Zone 2: 正式商用頂部快捷導航（即時匯率 + LINE 推播） */}
@@ -1541,7 +1535,46 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 space-y-6">
+
+        {/* 🌐 全球 5 大迪士尼國家/地區醒目切換列 */}
+        <section aria-label="全球迪士尼樂園切換" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+          {PARKS_LIST.map((park) => {
+            const isActive = park.id === selectedParkId;
+            const subLabel =
+              park.id === 'tokyo'
+                ? '陸地＋海洋 · 夢幻泉鄉'
+                : park.id === 'hongkong'
+                ? '魔雪奇緣世界'
+                : park.id === 'shanghai'
+                ? '瘋狂動物城'
+                : park.id === 'usa'
+                ? '加州＋佛羅里達奧蘭多'
+                : '歐洲雙園 · 粉紅城堡';
+            return (
+              <button
+                key={park.id}
+                type="button"
+                onClick={() => handleParkSwitch(park.id)}
+                className={`group px-3.5 py-3 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3 ${
+                  isActive
+                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md scale-[1.01]'
+                    : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-slate-800 shadow-2xs'
+                }`}
+              >
+                <span className="text-2xl sm:text-3xl shrink-0 leading-none">{park.flag}</span>
+                <div className="min-w-0">
+                  <div className={`text-sm sm:text-base font-black tracking-tight truncate ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                    {park.shortName}迪士尼
+                  </div>
+                  <div className={`text-[11px] font-bold truncate mt-0.5 ${isActive ? 'text-indigo-100' : 'text-slate-500'}`}>
+                    {subLabel}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </section>
 
         {/* 🔔 核心功能 1：【平台促銷降價・立馬通知我】訂閱核心卡片 */}
         <section id="subscribe" className={`bg-gradient-to-r ${currentPark.gradient} text-white rounded-3xl p-6 sm:p-7 shadow-xl border-2 border-indigo-500/40 relative overflow-hidden transition-all duration-300`}>
@@ -2379,7 +2412,9 @@ export default function App() {
                       ? '還沒買香港機場快線、太平山頂纜車、八達通或港澳網卡？'
                       : selectedParkId === 'shanghai'
                       ? '還沒買上海外灘觀光、機場接送或中港澳上網卡？'
-                      : '還沒買環球影城、美國網卡或加州城市觀光通票？'}
+                      : selectedParkId === 'paris'
+                      ? '還沒買巴黎 RER 交通、歐洲 eSIM、羅浮宮或塞納河遊船？'
+                      : '還沒買環球影城、美國網卡或加州 / 奧蘭多觀光通票？'}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                     出發前一次備齊交通與網卡最省事，可搭配平台當期優惠券一併結帳！
@@ -2507,6 +2542,10 @@ export default function App() {
                         ? 'https://www.hongkongdisneyland.com/zh-hk/calendars/day/'
                         : selectedParkId === 'shanghai'
                         ? 'https://www.shanghaidisneyresort.com/calendars/day/'
+                        : selectedParkId === 'paris'
+                        ? 'https://www.disneylandparis.com/en-usd/calendars/park-hours/'
+                        : selectedSubParkIndex === 2
+                        ? 'https://disneyworld.disney.go.com/calendars/day/'
                         : 'https://disneyland.disney.go.com/calendars/day/'
                     }
                     target="_blank"

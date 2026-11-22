@@ -81,6 +81,10 @@ export const PARK_MAINTENANCE: Record<DisneyParkId, MaintenanceItem[]> = {
     { park: 'land', name: '星際大戰：抵抗組織崛起', startDate: '2026-11-10', endDate: '2026-11-20', note: '全沉浸無軌車載系統例行保養' },
     { park: 'both', name: '太空山 (Space Mountain)', startDate: '2027-01-15', endDate: '2027-01-30', note: '軌道結構定期安全檢查' },
   ],
+  paris: [
+    { park: 'land', name: '巨雷山 (Big Thunder Mountain)', startDate: '2026-11-12', endDate: '2026-11-22', note: '湖心礦山軌道冬季例行安全檢修' },
+    { park: 'sea', name: '料理鼠王大冒險 (Ratatouille)', startDate: '2027-01-10', endDate: '2027-01-20', note: '4D 投影與無軌車體定期保養' },
+  ],
 };
 
 export const MAINTENANCE_LIST = PARK_MAINTENANCE.tokyo;
@@ -173,6 +177,25 @@ export function generateMonthData(year: number, month: number, parkId: DisneyPar
         localPrice = 104;
         crowd = 40;
         event = '平日超值 Tier 1 暢遊日';
+      }
+    } else if (parkId === 'paris') {
+      currencySymbol = '€';
+      currencyCode = 'EUR';
+      if (isYearEnd || isDecChristmas || month === 7 || month === 8) {
+        tier = 'expensive';
+        localPrice = 105;
+        crowd = 92;
+        event = month === 7 || month === 8 ? '🇫🇷 歐洲盛夏假期煙火高峰' : '🎄 巴黎冬季雪花聖誕慶典';
+      } else if (isWeekend || isFriday) {
+        tier = 'moderate';
+        localPrice = 79;
+        crowd = 68;
+        event = '週末粉紅城堡夢幻雙園日';
+      } else {
+        tier = 'cheap';
+        localPrice = 56;
+        crowd = 38;
+        event = '平日歐元超值暢遊日';
       }
     } else {
       // 預設為 Tokyo
