@@ -81,7 +81,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [klookDefaultDesc, setKlookDefaultDesc] = useState('');
   const [kkdayDefaultBonus, setKkdayDefaultBonus] = useState('購票即享日本高速 eSIM 1GB 體驗組');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('https://lin.ee/XnkEyyl');
-  const [gaMeasurementId, setGaMeasurementId] = useState('G-4X9B9D4VC8');
+  const [gaMeasurementId, setGaMeasurementId] = useState('G-BZBLXPCSDF');
   const [klookFeatures, setKlookFeatures] = useState<string[]>(defaultKlookFeatures);
   const [newKlookFeature, setNewKlookFeature] = useState<string>('');
   const [kkdayFeatures, setKkdayFeatures] = useState<string[]>(defaultKkdayFeatures);
@@ -1475,7 +1475,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                     className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
-                    💡 填入您的 Google Analytics 4 評估 ID（例如 <code>G-4X9B9D4VC8</code>），即可即時追蹤全站訪客瀏覽量、LINE 點擊率與票券導購轉換。
+                    💡 填入您的 Google Analytics 4 評估 ID（例如 <code>G-BZBLXPCSDF</code>），即可即時追蹤全站訪客瀏覽量、LINE 點擊率與票券導購轉換。
                   </p>
                 </div>
               </div>

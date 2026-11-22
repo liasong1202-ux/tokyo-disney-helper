@@ -366,7 +366,7 @@ const DEFAULT_STORE: StoreData = {
     klookDefaultDesc: '',
     kkdayDefaultBonus: '購票即享日本高速 eSIM 1GB 體驗組',
     lineOfficialUrl: 'https://lin.ee/XnkEyyl',
-    gaMeasurementId: process.env.VITE_GA_MEASUREMENT_ID || process.env.GA_MEASUREMENT_ID || 'G-4X9B9D4VC8',
+    gaMeasurementId: process.env.VITE_GA_MEASUREMENT_ID || process.env.GA_MEASUREMENT_ID || 'G-BZBLXPCSDF',
     klookFeatures: [
       '累積 Klook 旅遊積分，下次行程預訂可直接折抵現金',
       '支援 LINE Pay / 街口支付，省去 1.5% 海外刷卡手續費',
@@ -1485,7 +1485,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       exchangeRate: rateInfo,
       subscriberCount: 12480 + store.subscribers.length,
       realSubscriberCount: store.subscribers.length,
-      gaMeasurementId: store.affiliateConfig.gaMeasurementId || process.env.VITE_GA_MEASUREMENT_ID || process.env.GA_MEASUREMENT_ID || 'G-4X9B9D4VC8',
+      gaMeasurementId: store.affiliateConfig.gaMeasurementId || process.env.VITE_GA_MEASUREMENT_ID || process.env.GA_MEASUREMENT_ID || 'G-BZBLXPCSDF',
     });
     return true;
   }
@@ -1826,7 +1826,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         klookDefaultDesc: String(body.klookDefaultDesc ?? store.affiliateConfig.klookDefaultDesc).trim(),
         kkdayDefaultBonus: String(body.kkdayDefaultBonus ?? store.affiliateConfig.kkdayDefaultBonus).trim(),
         lineOfficialUrl: String(body.lineOfficialUrl ?? store.affiliateConfig.lineOfficialUrl ?? '').trim(),
-        gaMeasurementId: String(body.gaMeasurementId ?? store.affiliateConfig.gaMeasurementId ?? 'G-4X9B9D4VC8').trim(),
+        gaMeasurementId: String(body.gaMeasurementId ?? store.affiliateConfig.gaMeasurementId ?? 'G-BZBLXPCSDF').trim(),
         klookFeatures: Array.isArray(body.klookFeatures) ? body.klookFeatures.map(String) : store.affiliateConfig.klookFeatures,
         kkdayFeatures: Array.isArray(body.kkdayFeatures) ? body.kkdayFeatures.map(String) : store.affiliateConfig.kkdayFeatures,
       };
