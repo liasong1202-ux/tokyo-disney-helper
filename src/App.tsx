@@ -781,36 +781,36 @@ export default function App() {
       const adidMatch = (affiliateConfig.klookUrl || '').match(/aff_adid=([0-9a-zA-Z_-]+)/);
       const activeAid = aidMatch ? aidMatch[1] : '144150';
       const activeAdid = adidMatch ? adidMatch[1] : '1585528';
-      const citySlug =
+      const destUrl =
         selectedParkId === 'tokyo'
-          ? '28-tokyo-things-to-do'
+          ? 'https://www.klook.com/zh-TW/city/28-tokyo-things-to-do/'
           : selectedParkId === 'hongkong'
-          ? '1-hong-kong-things-to-do'
+          ? 'https://www.klook.com/zh-TW/search/result/?query=%E9%A6%99%E6%B8%AF%E7%86%B1%E9%96%80%E6%99%AF%E9%BB%9E%E4%BA%A4%E9%80%9A'
           : selectedParkId === 'shanghai'
-          ? '25-shanghai-things-to-do'
+          ? 'https://www.klook.com/zh-TW/search/result/?query=%E4%B8%8A%E6%B5%B7%E7%86%B1%E9%96%80%E6%99%AF%E9%BB%9E%E4%BA%A4%E9%80%9A'
           : selectedParkId === 'paris'
-          ? '10-paris-things-to-do'
+          ? 'https://www.klook.com/zh-TW/search/result/?query=%E5%B7%B4%E9%BB%8E%E7%86%B1%E9%96%80%E6%99%AF%E9%BB%9E%E4%BA%A4%E9%80%9A'
           : selectedSubParkIndex === 2
-          ? '83-orlando-things-to-do'
-          : '79-los-angeles-things-to-do';
-      const destUrl = `https://www.klook.com/zh-TW/city/${citySlug}/`;
+          ? 'https://www.klook.com/zh-TW/search/result/?query=%E5%A5%A7%E8%98%AD%E5%A4%9A%E7%86%B1%E9%96%80%E6%99%AF%E9%BB%9E%E4%BA%A4%E9%80%9A'
+          : 'https://www.klook.com/zh-TW/search/result/?query=%E6%B4%9B%E6%9D%89%E7%A3%AF%E7%86%B1%E9%96%80%E6%99%AF%E9%BB%9E%E4%BA%A4%E9%80%9A';
       return `https://affiliate.klook.com/redirect?aid=${activeAid}&aff_adid=${activeAdid}&k_site=${encodeURIComponent(destUrl)}`;
     } else {
       const cidMatch = (affiliateConfig.kkdayUrl || '').match(/cid=([0-9a-zA-Z_-]+)/);
       const activeCid = cidMatch ? cidMatch[1] : '28178';
-      const destSlug =
-        selectedParkId === 'tokyo'
-          ? 'jp-tokyo'
-          : selectedParkId === 'hongkong'
-          ? 'hk-hong-kong'
+      if (selectedParkId === 'tokyo') {
+        return `https://www.kkday.com/zh-tw/destination/jp-tokyo?cid=${activeCid}&ud3=prodcard&ud4=recommend`;
+      }
+      const keyword =
+        selectedParkId === 'hongkong'
+          ? '香港'
           : selectedParkId === 'shanghai'
-          ? 'cn-shanghai'
+          ? '上海'
           : selectedParkId === 'paris'
-          ? 'fr-paris'
+          ? '巴黎'
           : selectedSubParkIndex === 2
-          ? 'us-orlando'
-          : 'us-los-angeles';
-      return `https://www.kkday.com/zh-tw/destination/${destSlug}?cid=${activeCid}&ud3=prodcard&ud4=recommend`;
+          ? '奧蘭多'
+          : '洛杉磯';
+      return `https://www.kkday.com/zh-tw/product/productlist?keyword=${encodeURIComponent(keyword)}&cid=${activeCid}&ud1=disney_helper`;
     }
   };
 
