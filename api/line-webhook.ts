@@ -294,8 +294,50 @@ export default async function handler(req: any, res: any) {
     }
 
     const storageResults: SaveLineSubscriberResult[] = [];
+    const DISCLAIMER_TEXT = `本帳號為「自動情報監測推播機器人」，僅提供各大售票平台（Klook / KKday / 官網）即時票價、開賣資訊與限時優惠情報整理。
+
+📌【預約推播說明】
+1. 官方門票通常於入園日「前 2 個月（台灣時間每日 13:00）」開放預訂。
+2. 預計開賣日當天，系統會在此自動推播各大平台的【即時開賣購票連結】與當前可用的優惠資訊供您參考搶購。
+
+⚠️【免責與服務聲明】
+• 本帳號為「電腦系統自動發報」，無配置人工客服，恕無法回覆任何私人留言或諮詢。
+• 本站非售票旅行社或樂園官方，所有門票價格、庫存、訂單、退改票及園區規範，請直接以各大購票平台及樂園官方公告為準，票務問題請洽購票平台官方客服。
+
+預祝您順利購得門票，享受愉快的樂園之旅！🎈`;
 
     for (const event of events) {
+      if (event.type === 'follow') {
+        const replyToken = event.replyToken;
+        if (lineToken && replyToken) {
+          try {
+            await fetch('https://api.line.me/v2/bot/message/reply', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${lineToken}`,
+              },
+              body: JSON.stringify({
+                replyToken,
+                messages: [
+                  {
+                    type: 'text',
+                    text: '🎀【米妮歡迎您加入！】✨\n\n哈囉！歡迎來到迪士尼門票情報小幫手～\n只要在網站選好想去的入園日期，開賣當天米妮就會準時敲您發送搶票連結喔！🏰✨\n👉 https://tokyo-disney-helper.vercel.app/',
+                  },
+                  {
+                    type: 'text',
+                    text: DISCLAIMER_TEXT,
+                  },
+                ],
+              }),
+            });
+          } catch (followErr) {
+            console.error('[LINE Follow Reply Error]', followErr);
+          }
+        }
+        continue;
+      }
+
       if (event.type === 'message' && event.message?.type === 'text') {
         const text = String(event.message.text || '');
         const userId = event.source?.userId;
@@ -359,12 +401,23 @@ export default async function handler(req: any, res: any) {
               },
               body: JSON.stringify({
                 replyToken,
-                messages: [
-                  {
-                    type: 'text',
-                    text: replyText,
-                  },
-                ],
+                messages: targetDate
+                  ? [
+                      {
+                        type: 'text',
+                        text: replyText,
+                      },
+                      {
+                        type: 'text',
+                        text: DISCLAIMER_TEXT,
+                      },
+                    ]
+                  : [
+                      {
+                        type: 'text',
+                        text: replyText,
+                      },
+                    ],
               }),
             });
             if (!replyRes.ok) {
