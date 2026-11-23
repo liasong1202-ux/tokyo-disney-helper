@@ -388,7 +388,7 @@ export default async function handler(req: any, res: any) {
           try {
             let replyText = '';
             if (targetDate) {
-              replyText = `${matchedChar.icon}【${charDisplayName}開賣預約已登記】✨\n\n哈囉！${charDisplayName}已經幫您記在小本本囉～\n📅 入園日期：${targetDate}\n🏰 目標樂園：${parkName}\n⏰ 預計開賣：${saleOpenDate || '入園前 2 個月'} 13:00\n\n開賣當天${charDisplayName}會準時敲您發送早鳥特惠連結，不用擔心漏掉喔！🏰✨`;
+              replyText = `${matchedChar.icon}【${charDisplayName}開賣預約已登記】✨\n\n哈囉！${charDisplayName}已經幫您記在小本本囉～\n📅 入園日期：${targetDate}\n🏰 目標樂園：${parkName}\n⏰ 預計開賣：${saleOpenDate || '入園前 2 個月'} 13:00\n\n開賣當天${charDisplayName}會準時敲您發送專屬訂票連結，不用擔心漏掉喔！🏰✨`;
             } else {
               replyText = `${matchedChar.icon}【${charDisplayName}收到您的訊息】\n\n哈囉！歡迎加入～隨時在網站查看最新即時低價日曆與開賣倒數唷！✨\nhttps://tokyo-disney-helper.vercel.app/`;
             }

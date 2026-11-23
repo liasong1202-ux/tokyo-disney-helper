@@ -98,6 +98,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
   const [promoFixedDiscount, setPromoFixedDiscount] = useState(50);
   const [promoBadge, setPromoBadge] = useState('Klook 突發 85 折特惠');
   const [sendEmailBroadcast, setSendEmailBroadcast] = useState(true);
+  const [promoTargetScope, setPromoTargetScope] = useState<'available_promo' | 'all_promo'>('available_promo');
   const [customEmailMessage, setCustomEmailMessage] = useState(
     '站長實測這波折扣碼剛釋出還有名額！建議挑選日曆上綠色（¥8,900~9,400）的平日入園，搭配折扣碼省最多！'
   );
@@ -628,6 +629,7 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
           fixedDiscountTwd: Number(promoFixedDiscount),
           badge: promoBadge,
           sendEmailBroadcast: activate && sendEmailBroadcast,
+          targetScope: promoTargetScope,
           customEmailMessage,
         }),
       });
@@ -1663,23 +1665,76 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                     className="w-4 h-4 accent-indigo-600 rounded"
                   />
                   <span className="text-xs sm:text-sm font-black text-indigo-950">
-                    📩 發布時，同時透過 Resend 自動寄發「降價通知信（含聯盟行銷購票按鈕）」給所有訂閱者
+                    📩 發布時，自動寄發「優惠通知信（含聯盟行銷購票按鈕）」
                   </span>
                 </label>
 
-                {sendEmailBroadcast && (
-                  <div>
-                    <label className="block text-xs font-bold text-indigo-900 mb-1">
-                      信件內附加的站長悄悄話 / 購票提醒：
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={customEmailMessage}
-                      onChange={(e) => setCustomEmailMessage(e.target.value)}
-                      className="w-full p-2.5 text-xs bg-white border border-indigo-200 rounded-xl"
-                    />
-                  </div>
-                )}
+                {sendEmailBroadcast && (() => {
+                  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+                  const countForScope = (scope: 'available_promo' | 'all_promo') =>
+                    subscribers.filter((s) => {
+                      if (!s.email || s.email.endsWith('@example.com') || s.email.endsWith('@line.user')) return false;
+                      if (s.alertType === 'ticket_open') return false;
+                      if (scope === 'available_promo') {
+                        if (s.saleOpenDate && s.saleOpenDate > todayStr) return false;
+                      }
+                      return true;
+                    }).length;
+                  const selectedCount = countForScope(promoTargetScope);
+
+                  return (
+                    <div className="space-y-3 pt-1">
+                      <div className="bg-white border border-indigo-200 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-black text-indigo-950">
+                          <span>🎯 選擇寄送對象（已自動排除「純預約開賣提醒」名單）：</span>
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                            本次預計寄出 {selectedCount} 封
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5 text-xs">
+                          <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-all ${promoTargetScope === 'available_promo' ? 'bg-indigo-50 border-indigo-400 font-bold text-indigo-950' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                            <span className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="promoTargetScope"
+                                checked={promoTargetScope === 'available_promo'}
+                                onChange={() => setPromoTargetScope('available_promo')}
+                                className="accent-indigo-600"
+                              />
+                              <span>🎯 只寄給「現在已經可以買票」的優惠訂閱者（推薦）</span>
+                            </span>
+                            <span className="font-black text-indigo-700 shrink-0 ml-2">{countForScope('available_promo')} 人</span>
+                          </label>
+                          <label className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-all ${promoTargetScope === 'all_promo' ? 'bg-indigo-50 border-indigo-400 font-bold text-indigo-950' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                            <span className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="promoTargetScope"
+                                checked={promoTargetScope === 'all_promo'}
+                                onChange={() => setPromoTargetScope('all_promo')}
+                                className="accent-indigo-600"
+                              />
+                              <span>🔥 寄給所有「想收優惠」的訂閱者（含尚未開賣的月份）</span>
+                            </span>
+                            <span className="font-black text-slate-700 shrink-0 ml-2">{countForScope('all_promo')} 人</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-indigo-900 mb-1">
+                          信件內附加的站長悄悄話 / 購票提醒：
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={customEmailMessage}
+                          onChange={(e) => setCustomEmailMessage(e.target.value)}
+                          className="w-full p-2.5 text-xs bg-white border border-indigo-200 rounded-xl"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <button
@@ -1691,8 +1746,8 @@ export default function AdminModal({ isOpen, onClose, onStateUpdated }: AdminMod
                 <Zap className="w-4 h-4" />
                 <span>
                   {sendEmailBroadcast
-                    ? '🚀 立即發布全站降價特惠 ＋ 群發 Email 通知所有訂閱者'
-                    : '🚀 立即發布全站降價特惠（僅更新網站日曆）'}
+                    ? '🚀 立即發布全站優惠活動 ＋ 依上方篩選寄發 Email 通知'
+                    : '🚀 立即發布全站優惠活動（僅更新網站日曆）'}
                 </span>
               </button>
 

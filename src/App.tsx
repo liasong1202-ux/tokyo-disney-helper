@@ -279,8 +279,8 @@ export default function App() {
     const finalChar = charName || currentChar.shortName || '米妮';
     const charPart = `，指定【${finalChar}】為專屬守護大使`;
     const defaultMsg = dateTarget 
-      ? `您好！我想預約 ${dateTarget} 開賣通知${charPart}與早鳥特惠 🏰✨`
-      : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與早鳥特惠 🏰✨`;
+      ? `您好！我想預約 ${dateTarget} 開賣通知${charPart}與優惠提醒 🏰✨`
+      : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與優惠提醒 🏰✨`;
 
     trackGaEvent('line_alert_click', {
       park: selectedParkId,
@@ -2871,7 +2871,7 @@ export default function App() {
               <p className="text-xs sm:text-sm text-slate-600 mt-4 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                 {reservedOpenDateInfo ? (
                   <>
-                    當 <strong>{reservedOpenDateInfo.date}</strong> 的門票一開放預訂（或 Klook / KKday 釋出早鳥折扣碼），系統將<strong>第一時間發送 Email 訂票連結給您</strong>！
+                    當 <strong>{reservedOpenDateInfo.date}</strong> 的門票一開放預訂，系統將<strong>第一時間發送 Email 訂票連結給您</strong>！
                   </>
                 ) : (
                   <>
@@ -2969,8 +2969,8 @@ export default function App() {
         const modalChar = DISNEY_CHARACTERS.find(c => c.shortName === lineModalCharName || c.name.includes(lineModalCharName)) || activeChar;
         const charPart = `，指定【${modalChar.shortName}】為專屬守護大使`;
         const targetMsg = lineModalTargetDate 
-          ? `您好！我想預約 ${lineModalTargetDate} 開賣通知${charPart}與早鳥特惠 🏰✨`
-          : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與早鳥特惠 🏰✨`;
+          ? `您好！我想預約 ${lineModalTargetDate} 開賣通知${charPart}與優惠提醒 🏰✨`
+          : `您好！我想接收【海外樂園門票情報】開賣通知${charPart}與優惠提醒 🏰✨`;
         const targetLineUrl = `https://line.me/R/oaMessage/@272tfkev/?${encodeURIComponent(targetMsg)}`;
         const dynamicQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(targetLineUrl)}`;
 

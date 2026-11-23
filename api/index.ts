@@ -933,7 +933,7 @@ function buildWelcomeEmailHtml(store: StoreData, subscriber: Subscriber): string
               <div style="font-weight:900;font-size:15px;">⏰ 您預約監控的入園日期：${subscriber.targetDate}</div>
               <div style="margin-top:4px;font-size:13px;">
                 東京迪士尼門票於<strong>入園前 2 個月（預計 ${subscriber.saleOpenDate || '開賣日'} 台灣時間 13:00）</strong>開放預訂！<br/>
-                一旦該日期正式開放訂票或釋出早鳥折扣碼，${char.shortName} 將第一時間寄送圖文祝賀信通知您預約訂票！
+                一旦該日期正式開放訂票，${char.shortName} 將第一時間寄送圖文祝賀信通知您預約訂票！
               </div>
             </div>`
           : `<p>只要您關注的月份<strong>開放訂票</strong>，或 <strong>Klook / KKday</strong> 釋出限量快閃折扣碼，系統會在第一時間寄信通知您！</p>`
@@ -1924,12 +1924,30 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
       if (body.sendEmailBroadcast) {
         emailBroadcastResult.attempted = true;
+        const targetScope: 'available_promo' | 'all_promo' =
+          body.targetScope === 'all_promo' ? 'all_promo' : 'available_promo';
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+
         const recipients = store.subscribers
-          .map((s) => s.email)
-          .filter((e) => !e.endsWith('@example.com') && !e.endsWith('@line.user'));
+          .filter((s) => {
+            if (!s.email || s.email.endsWith('@example.com') || s.email.endsWith('@line.user')) {
+              return false;
+            }
+            // 永遠排除「僅預約開賣提醒」的訂閱者
+            if (s.alertType === 'ticket_open') return false;
+            if (targetScope === 'available_promo') {
+              const effectiveOpen =
+                s.saleOpenDate || (s.targetDate ? calculateSaleOpenDate(s.targetDate) : '');
+              if (effectiveOpen && effectiveOpen > todayStr) {
+                return false;
+              }
+            }
+            return true;
+          })
+          .map((s) => s.email);
 
         if (recipients.length === 0) {
-          emailBroadcastResult.error = '目前尚無真實訂閱者信箱（請先在前台輸入您的真實信箱訂閱測試！）';
+          emailBroadcastResult.error = '目前沒有符合條件的訂閱者信箱（已自動略過未開賣或僅預約開賣通知的名單）';
         } else if (!hasAnyEmailProvider(store)) {
           emailBroadcastResult.error = '尚未設定寄信服務（Gmail 或 Resend），全站促銷已生效，但信件尚未寄出。';
         } else {
@@ -2331,7 +2349,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
           if (sub.email && !sub.email.endsWith('@line.user') && hasAnyEmailProvider(store)) {
             try {
               const char = CHARACTERS_MAP[characterId] || CHARACTERS_MAP.minnie;
-              const subject = `🎟️ ${char.shortName}通知開賣：東京迪士尼【${targetDate}】早鳥特惠已開放預訂！`;
+              const subject = `🎟️ ${char.shortName}通知開賣：東京迪士尼【${targetDate}】門票已開放預訂！`;
               const html = buildTicketOpenEmailHtml(store, targetDate, parkName, undefined, characterId);
               const resMail = await sendUnifiedEmail(store, {
                 to: [sub.email],
